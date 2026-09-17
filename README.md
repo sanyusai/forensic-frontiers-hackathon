@@ -1,93 +1,105 @@
-# forensic-frontiers-hackathon
-
 # 🛡️ Unified Phishing Email & Malware Attachment Detection Framework
 
-> **AI-Assisted DFIR Platform for Phishing Email Detection, Malware Attachment Analysis, Risk Assessment, and Security Reporting**
+> **AI-Assisted DFIR Platform for Phishing Email Detection, Malware Attachment Analysis, Threat Classification, Risk Assessment, and Security Reporting**
 
-An integrated cybersecurity platform that combines **email forensics**, **malware attachment analysis**, **threat intelligence**, **risk correlation**, and **AI-assisted security reporting** into a single investigation workflow.
+An integrated cybersecurity platform designed to combine **email forensics**, **malware attachment analysis**, **threat intelligence**, **threat classification**, **risk correlation**, and **AI-assisted DFIR reporting** into a single investigation workflow.
 
-Instead of analyzing an email and its attachment as two independent problems, the system correlates evidence from both and produces a **single, explainable Composite Risk Score** with detailed findings, Indicators of Compromise (IOCs), and recommended remediation steps.
+Instead of treating a suspicious email and its attachment as two separate problems, the platform correlates evidence from both sources and produces a **single, explainable Composite Risk Score**, supported by technical findings, Indicators of Compromise (IOCs), malware classification, behavioral evidence, and recommended response actions.
 
 ---
 
-## 🎯 Problem Statement
+# 🎯 Problem Statement
 
-Phishing emails and malicious attachments are commonly used to gain an initial foothold in organizations.
+Phishing emails and malicious attachments are commonly used as initial access vectors in cyber attacks.
 
-Traditional email security tools may focus primarily on sender authentication, URLs, or email content, while malware scanners focus on the attached file. This can result in fragmented analysis where an analyst has to manually correlate multiple findings.
+Traditional email security tools may focus primarily on sender authentication, URLs, or email content, while malware scanners independently analyze attached files. This can result in fragmented investigations where security analysts must manually correlate findings from multiple tools.
 
 This project addresses that problem through a unified DFIR pipeline:
 
 ```text
-Email Ingestion
-      │
-      ├──────────────────────┐
-      ▼                      ▼
-Email Analysis        Attachment Analysis
-      │                      │
-      ▼                      ▼
-Trust Score           Threat Score
-      │                      │
-      └──────────┬───────────┘
-                 ▼
-       Correlation Engine
-                 │
-                 ▼
-       Composite Risk Score
-                 │
-                 ▼
-       AI-Assisted Analysis
-                 │
-                 ▼
-       DFIR Risk Assessment
-                 │
-                 ▼
-       Report + IOCs + Actions
+                         EMAIL
+                           │
+                           ▼
+                    Gmail / Mailbox
+                           │
+                           ▼
+                       INGESTION
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+       EMAIL ANALYSIS             ATTACHMENT
+              │                    ANALYSIS
+              ▼                         │
+        Trust Score                     ▼
+                              Static Malware Analysis
+                                        │
+                                        ▼
+                               Threat Classification
+                                        │
+                                        ▼
+                                  Threat Score
+              │                         │
+              └────────────┬────────────┘
+                           ▼
+                   CORRELATION ENGINE
+                           │
+                           ▼
+                 COMPOSITE RISK SCORE
+                           │
+                           ▼
+                  AI SECURITY ANALYST
+                           │
+                           ▼
+                 DFIR RISK ASSESSMENT
+                           │
+                           ▼
+                REPORT + IOCs + ACTIONS
 ```
 
-The architecture is designed around a single case and evidence trail so that email headers, metadata, attachment hashes, YARA findings, and other indicators can be correlated under one investigation.
+The architecture is designed around a **single Case ID and evidence trail**, allowing email headers, authentication results, domains, URLs, attachment hashes, YARA findings, threat intelligence, and behavioral indicators to be correlated within one investigation.
 
 ---
 
 # 🚀 Core Features
 
-## 📥 1. Inbox
+## 📥 1. Unified Inbox
 
-The Inbox provides a centralized interface for viewing emails retrieved from a connected mailbox or controlled demonstration mailbox.
+The Inbox provides a centralized interface for viewing emails retrieved from a connected mailbox.
 
-### Features
+### Current Implementation
 
-* Email listing
-* Sender and recipient information
-* Subject and timestamp
+* Gmail API integration
+* Email retrieval from Gmail inbox
+* Sender information
+* Subject
+* Timestamp
 * Attachment detection
-* Email search/filtering
-* Analysis status
-* Risk/severity indicator
-* Select an email to initiate forensic analysis
+* Email selection for analysis
+* Risk/severity indicators
+* Email analysis workflow
 
 ### Planned Integrations
 
-* Gmail API
 * Microsoft Graph API
 * IMAP
 * Mail gateway / ingestion hooks
+* Enterprise mail-server integration
 
-The underlying architecture supports mailbox feeds, APIs, IMAP polling, and mail-server/gateway integration.
+The current prototype uses the **Gmail API as the primary mailbox integration**.
 
 ---
 
 # 🔍 2. Email Analysis Engine
 
-The Email Analysis Engine performs a structured forensic examination of the selected email.
+The Email Analysis Engine performs a structured forensic examination of a selected email.
 
 Instead of simply returning:
 
 > "This email is phishing."
 
-the application executes a series of individual security checks and displays the result of each check.
+the application performs multiple individual security checks and presents the result of each check.
 
-Each test provides:
+Each test can return:
 
 ```text
 ✓ PASS
@@ -100,16 +112,18 @@ along with:
 * Technical finding
 * Risk contribution
 * Explanation
-* Evidence
+* Supporting evidence
 * Recommended action
+
+The objective is to make the detection process **explainable rather than a black-box classification**.
 
 ---
 
-## 🧪 Email Security Checklist
+# 🧪 Email Security Checklist
 
-The analysis engine can evaluate parameters including:
+The Email Analysis Engine can evaluate multiple categories of indicators.
 
-### Sender & Authentication
+## Sender & Authentication
 
 * SPF verification
 * DKIM verification
@@ -122,7 +136,7 @@ The analysis engine can evaluate parameters including:
 * Received-chain analysis
 * Sender IP analysis
 
-### Domain & Identity
+## Domain & Identity
 
 * Domain reputation
 * Domain age
@@ -131,9 +145,9 @@ The analysis engine can evaluate parameters including:
 * Lookalike-domain detection
 * Typosquatting detection
 * Homograph / Punycode detection
-* Levenshtein/fuzzy domain similarity
+* Levenshtein / fuzzy domain similarity
 
-### URL & Content
+## URL & Content
 
 * URL extraction
 * URL reputation
@@ -146,7 +160,7 @@ The analysis engine can evaluate parameters including:
 * Hidden or obfuscated HTML
 * QR-code phishing detection
 
-### Metadata & Forensics
+## Metadata & Forensics
 
 * Embedded file/image metadata
 * Timestamp inconsistencies
@@ -154,13 +168,18 @@ The analysis engine can evaluate parameters including:
 * Hash inconsistencies
 * Sender behavior anomalies
 
-The enhanced detection parameters include display-name spoofing, Reply-To mismatch, homograph domains, domain age, sender behavior baselines, redirect analysis, SSL inspection, QR-code phishing, hidden HTML, and RTLO filename tricks.
+## Additional Detection
+
+* RTLO filename tricks
+* Trusted sender / allow-list checks
+* Organization impersonation
+* Context mismatch between email content and attachment type
 
 ---
 
-## 📊 Email Trust Score
+# 📊 Email Trust Score
 
-The Email Analysis Engine produces a **Trust Score from 0–100** along with structured indicators explaining how the score was calculated.
+The Email Analysis Engine produces an **Email Trust Score from 0–100** along with structured indicators explaining the score.
 
 Example:
 
@@ -194,55 +213,168 @@ Recommendation:
 Treat the sender identity as untrusted.
 ```
 
-The objective is to make every detection **explainable rather than a black-box classification**.
+Every score should be supported by individual security findings so that analysts can understand **why an email received its risk level**.
 
 ---
 
 # 🦠 3. Malware Attachment Analysis Engine
 
-When an email contains an attachment, the attachment can be passed to the Malware Analysis Engine.
+When an email contains an attachment, the attachment can be opened from the same investigation and passed into the Malware Analysis Engine.
 
-The system performs static analysis first and can optionally integrate with an isolated sandbox for dynamic analysis.
+The intended workflow is:
 
 ```text
-Attachment
-     │
-     ▼
-File Identification
-     │
-     ▼
-Hash Generation
-     │
-     ▼
-Static Analysis
-     │
-     ├── YARA
-     ├── Entropy
-     ├── PE Analysis
-     ├── Metadata
-     ├── Macros
-     ├── Embedded Objects
-     └── Strings
-     │
-     ▼
+Email
+ │
+ ▼
+Attachment Detected
+ │
+ ▼
+User selects attachment
+ │
+ ▼
+"Analyze Attachment"
+ │
+ ▼
+Secure Attachment Retrieval
+ │
+ ▼
+Temporary Isolated Analysis Environment
+ │
+ ▼
+Static Malware Analysis
+ │
+ ▼
+Threat Classification
+ │
+ ▼
 Threat Intelligence
-     │
-     ▼
+ │
+ ▼
 Threat Score
 ```
 
+The malware file should **not be executed directly on the host running the web application**.
+
+Instead, the attachment is transferred to a controlled analysis environment where analysis can be performed independently from the main application.
+
 ---
 
-## 🔬 Malware Analysis Checklist
+# 🔐 Isolated Attachment Analysis Environment
 
-### File Identification
+A major part of the planned malware-analysis architecture is an isolated environment for handling suspicious attachments.
+
+The conceptual workflow is:
+
+```text
+                  Gmail API
+                     │
+                     ▼
+                  Backend
+                     │
+                     │ Retrieve attachment
+                     ▼
+          ┌─────────────────────────┐
+          │  ISOLATED ANALYSIS ENV  │
+          │                         │
+          │  Temporary Case Space   │
+          │                         │
+          │  attachment.exe         │
+          │  hashes.json            │
+          │  metadata.json          │
+          │  yara_results.json      │
+          │  strings.txt            │
+          └────────────┬────────────┘
+                       │
+                       ▼
+                 STATIC ANALYSIS
+                       │
+                       ▼
+               THREAT CLASSIFIER
+                       │
+                       ▼
+              STRUCTURED RESULTS
+                       │
+                       ▼
+                    BACKEND
+                       │
+                       ▼
+                    PORTAL
+```
+
+The attachment is intended to exist only temporarily for analysis.
+
+The analysis environment should:
+
+* Isolate suspicious files from the main application
+* Use temporary case-specific storage
+* Restrict unnecessary access
+* Prevent direct exposure of malware samples
+* Automatically clean up temporary samples according to the configured retention policy
+* Return structured analysis results rather than exposing the sample to the frontend
+
+### Important Security Principle
+
+> **The web application should never execute an untrusted attachment directly on the host system.**
+
+---
+
+# 🔬 Static Malware Analysis
+
+The first stage of malware analysis is **static analysis**.
+
+Static analysis examines the file without executing it.
+
+```text
+Attachment
+    │
+    ▼
+File Identification
+    │
+    ▼
+Hash Generation
+    │
+    ▼
+Static Analysis
+    │
+    ├── File Type
+    ├── Magic Bytes
+    ├── Extension
+    ├── Entropy
+    ├── Strings
+    ├── PE Analysis
+    ├── Metadata
+    ├── Digital Signature
+    ├── Macros / VBA
+    ├── Embedded Objects
+    └── YARA
+    │
+    ▼
+Threat Intelligence
+    │
+    ▼
+Threat Classification
+    │
+    ▼
+Threat Score
+```
+
+Static analysis can provide important evidence about what a file contains and what capabilities it may possess.
+
+However, static analysis alone cannot provide complete visibility into the runtime behavior of a malicious program.
+
+---
+
+# 🧬 Malware Analysis Checklist
+
+## File Identification
 
 * File extension validation
 * Magic-byte verification
 * Extension spoofing detection
 * File-type mismatch detection
 
-### Hash Analysis
+## Hash Analysis
 
 * MD5
 * SHA-256
@@ -250,7 +382,7 @@ Threat Score
 * Internal case-history lookup
 * Threat-intelligence reputation
 
-### Static Malware Analysis
+## Static Malware Analysis
 
 * YARA rule matching
 * Entropy analysis
@@ -264,7 +396,7 @@ Threat Score
 * Embedded object analysis
 * OLE/DDE checks
 
-### Delivery-Trick Detection
+## Delivery-Trick Detection
 
 * Password-protected archives
 * Nested archives
@@ -272,17 +404,19 @@ Threat Score
 * ISO/IMG disk-image files
 * LNK shortcut analysis
 * Script obfuscation
-* PowerShell/VBS/JavaScript analysis
+* PowerShell analysis
+* VBS analysis
+* JavaScript analysis
 * Base64 / encoded command detection
 * RTLO filename tricks
 
-The enhancement addendum specifically expands the attachment engine beyond YARA by adding entropy, PE inspection, digital signatures, Office macro analysis, embedded-object checks, archive analysis, ISO/IMG detection, LNK analysis, script deobfuscation, and fuzzy hashing.
-
 ---
 
-# 🧬 Malware Classification
+# 🧬 Malware Threat Classification Engine
 
-YARA-based classification can categorize suspicious samples into families/classes such as:
+The Threat Classification Engine is designed to combine multiple pieces of evidence rather than relying on a single indicator.
+
+Potential classifications include:
 
 ```text
 Trojan
@@ -291,11 +425,12 @@ Ransomware
 RAT
 Botnet
 Adware
+Downloader
 Generic Malware
 Fileless Malware
 ```
 
-The system can produce:
+Example:
 
 ```text
 THREAT SCORE
@@ -314,47 +449,146 @@ SHA-256:
 xxxxxxxxxxxxxxxx...
 ```
 
-The framework specifies a Threat Classification Score together with malware-family classification and an IOC list.
-
----
-
-# 🧪 Sandbox Analysis
-
-A sandbox is planned as an isolated analysis environment for controlled dynamic malware analysis.
+The classification engine can consider:
 
 ```text
-                  Attachment
-                      │
-                      ▼
-              ┌───────────────┐
-              │ Isolated      │
-              │ Sandbox       │
-              ├───────────────┤
-              │ Process       │
-              │ Network       │
-              │ Files         │
-              │ Registry      │
-              │ Persistence   │
-              └───────┬───────┘
-                      │
-                      ▼
-              Behavioral IOCs
+                 ┌───────────────┐
+                 │ Static        │
+                 │ Evidence      │
+                 └───────┬───────┘
+                         │
+                 ┌───────▼───────┐
+                 │ YARA Matches   │
+                 │ File Features  │
+                 │ Hashes         │
+                 │ PE Indicators  │
+                 └───────┬───────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ Threat        │
+                 │ Classification│
+                 └───────┬───────┘
+                         │
+                         ▼
+                    Threat Score
 ```
 
-Potential future implementations include:
-
-* Cuckoo Sandbox
-* Container/VM-based isolated detonation environment
-
-Sandboxing is intentionally treated as a later-stage capability rather than a dependency for the core MVP.
-
-**Safety principle:** arbitrary attachments should never be executed directly on the host system.
+Known-malicious hashes, strong YARA matches, or severe classifications can trigger higher-severity decisions.
 
 ---
 
-# 🔗 4. Correlation & Unified Risk Engine
+# 🧪 4. Dynamic Malware Sandbox
 
-This is the central component that connects the email and malware scanners.
+Static analysis provides valuable information, but it cannot fully reveal what a malicious program does when executed.
+
+Therefore, **dynamic analysis is planned as an advanced stage of the Malware Analysis Engine**.
+
+Unlike static analysis, dynamic analysis executes the sample inside a highly isolated environment and observes its behavior.
+
+```text
+                         MALWARE
+                            │
+                            ▼
+                  ┌──────────────────┐
+                  │ Isolated VM      │
+                  │ / Sandbox        │
+                  └────────┬─────────┘
+                           │
+                     Controlled
+                      Execution
+                           │
+            ┌──────────────┼──────────────┐
+            ▼              ▼              ▼
+        Processes        Files          Network
+            │              │              │
+            ▼              ▼              ▼
+       Process Tree    File Changes    DNS / IPs
+            │              │              │
+            └──────────────┼──────────────┘
+                           ▼
+                  Behavioral Analysis
+                           │
+                           ▼
+                 Behavioral IOCs
+```
+
+Potential dynamic-analysis outputs include:
+
+* Process tree
+* Processes spawned
+* Files created
+* Files modified
+* Registry/system changes
+* Persistence mechanisms
+* DNS requests
+* Network connections
+* Downloaded payloads
+* Command execution
+* C2 indicators
+* Behavioral IOCs
+
+Possible future technologies include:
+
+* Cuckoo Sandbox
+* VM-based malware detonation
+* Other isolated analysis environments
+
+Dynamic analysis is intentionally separated from the core MVP because it introduces significantly greater infrastructure and security requirements.
+
+---
+
+# 🔗 5. Threat Intelligence
+
+Threat intelligence allows the platform to determine whether indicators discovered during analysis have previously been associated with malicious activity.
+
+Potential integrations include:
+
+```text
+VirusTotal
+AbuseIPDB
+MalwareBazaar
+MISP
+OTX
+WHOIS / Domain Intelligence
+Internal IOC Database
+```
+
+Indicators that can be checked include:
+
+```text
+SHA-256
+MD5
+IP Addresses
+Domains
+URLs
+File Names
+Fuzzy Hashes
+YARA Matches
+```
+
+Example:
+
+```text
+SHA-256
+     │
+     ▼
+Threat Intelligence
+     │
+     ├── Known malicious sample
+     ├── Previous sightings
+     ├── Associated malware family
+     ├── Related domains
+     └── Related infrastructure
+```
+
+Threat intelligence results become additional evidence for the Threat Classification and Risk Correlation engines.
+
+---
+
+# 🔗 6. Correlation & Unified Risk Engine
+
+This is the central component connecting the email and malware analysis pipelines.
 
 Instead of producing two unrelated results:
 
@@ -366,33 +600,45 @@ Attachment:
 Malicious
 ```
 
-the system correlates the evidence into:
+the platform correlates the evidence:
 
 ```text
-                 EMAIL
-                   │
-            Trust Score
-                   │
-                   ▼
-             ┌───────────┐
-             │           │
-             │ CORRELATE │
-             │           │
-             └───────────┘
-                   ▲
-                   │
-          Threat Classification
-                   │
-              ATTACHMENT
-                   │
-                   ▼
+                    EMAIL
+                      │
+                      ▼
+                Email Trust Score
+                      │
+                      │
+                      ▼
+                ┌─────────────┐
+                │ CORRELATION │
+                │   ENGINE    │
+                └─────────────┘
+                      ▲
+                      │
+                Threat Score
+                      │
+                      ▲
+                 ATTACHMENT
+```
 
-        COMPOSITE RISK SCORE
+The result is:
+
+```text
+Email Evidence
+      +
+Attachment Evidence
+      +
+Threat Intelligence
+      +
+Behavioral Evidence
+      ↓
+Composite Risk Score
 ```
 
 ---
 
-## ⚖️ Suggested Risk Model
+# ⚖️ Suggested Risk Model
 
 The initial framework proposes the following weighting:
 
@@ -405,17 +651,31 @@ The initial framework proposes the following weighting:
 | YARA Classification Severity |    25% |
 | Reputation / Known-Bad Match |    10% |
 
-Weights can be tuned for different organizational environments.
+These weights can be tuned for different organizational environments.
 
-Known-malicious hashes or severe malware classifications can trigger an override rule so that a confirmed malicious attachment is not diluted by a relatively normal-looking email.
+Additional behavioral evidence from dynamic analysis can be incorporated once the dynamic sandbox is implemented.
+
+A confirmed malicious hash or severe malware classification may trigger an override rule so that a confirmed malicious attachment is not diluted by a relatively normal-looking email.
 
 ---
 
 # 🧠 AI-Assisted Security Analyst
 
-AI is used as an **analysis and explanation layer**, rather than replacing deterministic security controls.
+AI is used as an **analysis, correlation, explanation, and reporting layer**, rather than replacing deterministic security controls.
 
-The AI receives structured findings from the detection engines.
+The underlying detection engines remain responsible for evidence-based security checks such as:
+
+* SPF/DKIM/DMARC
+* Hashing
+* File identification
+* YARA
+* Magic-byte verification
+* PE analysis
+* Reputation
+* URL analysis
+* Threat-intelligence lookups
+
+The AI receives structured findings from these engines.
 
 Example:
 
@@ -431,7 +691,7 @@ Example:
 }
 ```
 
-The AI can then produce an analyst-friendly explanation:
+The AI can then generate an analyst-friendly explanation:
 
 ```text
 Verdict: MALICIOUS
@@ -452,11 +712,11 @@ Recommended Actions:
 • Review potentially affected endpoints.
 ```
 
-This allows the underlying security detections to remain evidence-based while AI assists with interpretation, summarization, and reporting.
+The purpose is to transform technical security evidence into an understandable analyst report without making AI the sole source of the verdict.
 
 ---
 
-# 📋 5. Risk Assessment & DFIR Report Generation
+# 📋 7. Risk Assessment & DFIR Report Generation
 
 Every investigation is associated with a unique **Case ID**.
 
@@ -475,15 +735,17 @@ The report generator combines evidence from:
 * Attachment analysis
 * Hash analysis
 * YARA results
+* Threat classification
 * Threat intelligence
+* Dynamic analysis, when available
 * Risk correlation
-* AI-generated explanation
+* AI-assisted explanation
 
 ---
 
-## 📄 Report Structure
+# 📄 DFIR Report Structure
 
-Generated reports follow a professional security-assessment format:
+Generated reports can follow a professional security-assessment format:
 
 ```text
 SECURITY INCIDENT REPORT
@@ -509,24 +771,28 @@ Overall Verdict
 
 8. Attachment Analysis
 
-9. Malware Analysis
+9. Static Malware Analysis
 
-10. Threat Intelligence
+10. Dynamic Malware Analysis
 
-11. Indicators of Compromise
+11. Threat Classification
 
-12. Risk Assessment
+12. Threat Intelligence
 
-13. Findings & Evidence
+13. Indicators of Compromise
 
-14. Recommended Remediation
+14. Risk Assessment
 
-15. Incident Response Actions
+15. Findings & Evidence
 
-16. Chain of Custody / Audit Trail
+16. Recommended Remediation
+
+17. Incident Response Actions
+
+18. Chain of Custody / Audit Trail
 ```
 
-Example final assessment:
+Example:
 
 ```text
 ╔══════════════════════════════════╗
@@ -538,40 +804,40 @@ Example final assessment:
 ╚══════════════════════════════════╝
 ```
 
-The report includes the overall verdict, evidence summary, malware profile, remediation guidance, Case ID, and timestamped audit trail.
+The report should explain **why** the score was produced rather than only displaying the final number.
 
 ---
 
 # 🧾 Indicators of Compromise
 
-The platform extracts and presents IOCs such as:
+The platform extracts and presents IOCs discovered during investigation.
 
-### Domains
+## Domains
 
 ```text
 example-malicious-domain.com
 ```
 
-### IP Addresses
+## IP Addresses
 
 ```text
 185.xxx.xxx.xxx
 ```
 
-### URLs
+## URLs
 
 ```text
 hxxps://example.com/login
 ```
 
-### File Hashes
+## File Hashes
 
 ```text
 SHA-256:
 xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### Malware Indicators
+## Malware Indicators
 
 ```text
 YARA rule matches
@@ -579,13 +845,56 @@ Suspicious imports
 C2 indicators
 Dropped files
 Persistence mechanisms
+Suspicious processes
+Network indicators
 ```
 
-Sandbox-derived behavioral IOCs can be incorporated once dynamic analysis is implemented.
+Once dynamic analysis is implemented, behavioral IOCs can also be incorporated.
 
 ---
 
-# 🛠️ Recommended Technology Stack
+# 🌐 Threat Intelligence Sharing
+
+A future capability of the platform is to support controlled sharing of discovered IOCs with authorized security teams or organizations.
+
+The concept is:
+
+```text
+Organization A
+      │
+      │ Malware detected
+      ▼
+DFIR Platform
+      │
+      ▼
+Extract IOCs
+      │
+      ▼
+Threat Intelligence Repository
+      │
+      ├─────────────┬─────────────┐
+      ▼             ▼             ▼
+ Organization B  Organization C  Organization D
+```
+
+Potentially shared intelligence could include:
+
+```text
+Malicious SHA-256
+Associated domains
+Associated IP addresses
+URLs
+Malware family
+YARA indicators
+Observed behavior
+C2 indicators
+```
+
+This capability should use appropriate authorization, privacy controls, and organizational policies. Sensitive incident information should not be automatically disclosed to unrelated parties.
+
+---
+
+# 🛠️ Technology Stack
 
 ## Frontend
 
@@ -609,29 +918,41 @@ FastAPI
 ```text
 Python email
 mailparser
-IMAP
 Gmail API
+IMAP
 Microsoft Graph API
 ```
 
-## Security Analysis
+## Email & Domain Security
+
+```text
+SPF
+DKIM
+DMARC
+WHOIS
+Levenshtein / fuzzy matching
+URL analysis
+```
+
+## Malware Analysis
 
 ```text
 YARA / yara-python
 libmagic
 ExifTool
 hashlib
-Levenshtein / fuzzy matching
-```
-
-## Malware Analysis
-
-```text
-YARA
 PE analysis
 Entropy analysis
 Fuzzy hashing
-Optional sandbox
+Macro / OLE analysis
+```
+
+## Dynamic Analysis
+
+```text
+Isolated VM
+Cuckoo Sandbox
+Container / VM-based analysis
 ```
 
 ## Machine Learning / NLP
@@ -646,9 +967,10 @@ Hugging Face Transformers
 ```text
 VirusTotal
 AbuseIPDB
-WHOIS
+MalwareBazaar
 MISP
 OTX
+WHOIS
 ```
 
 ## Database
@@ -666,71 +988,80 @@ SQLite
 ## Reporting
 
 ```text
-HTML / PDF report generation
+HTML
+PDF
 ```
 
-## The original framework recommends Python-based email processing, YARA, ExifTool, libmagic, threat-intelligence APIs, a lightweight ML/rules engine, and SQLite/Postgres.
+---
 
 # 🏗️ System Architecture
 
 ```text
-                         ┌─────────────────────┐
-                         │   Gmail / Outlook   │
-                         │   IMAP / Mail Feed  │
-                         └──────────┬──────────┘
+                         ┌──────────────────────┐
+                         │      GMAIL API       │
+                         │   / Outlook / IMAP   │
+                         └──────────┬───────────┘
                                     │
                                     ▼
-                         ┌─────────────────────┐
-                         │   INGESTION LAYER   │
-                         └──────────┬──────────┘
+                         ┌──────────────────────┐
+                         │   INGESTION LAYER    │
+                         └──────────┬───────────┘
                                     │
-                    ┌───────────────┴───────────────┐
-                    │                               │
-                    ▼                               ▼
-          ┌─────────────────────┐        ┌─────────────────────┐
-          │ EMAIL ANALYSIS      │        │ ATTACHMENT ANALYSIS │
-          │                     │        │                     │
-          │ SPF / DKIM / DMARC  │        │ File Type           │
-          │ Headers             │        │ Magic Bytes         │
-          │ Sender IP           │        │ SHA-256             │
-          │ Domain              │        │ YARA                │
-          │ URLs                │        │ PE Analysis         │
-          │ Social Engineering  │        │ Entropy             │
-          │ Metadata            │        │ Macros              │
-          │ Impersonation       │        │ Reputation           │
-          └──────────┬──────────┘        └──────────┬──────────┘
-                     │                              │
-                     ▼                              ▼
-              ┌────────────┐                ┌────────────┐
-              │ Trust Score│                │Threat Score│
-              └──────┬─────┘                └──────┬─────┘
-                     │                              │
-                     └──────────────┬───────────────┘
+                   ┌────────────────┴────────────────┐
+                   │                                 │
+                   ▼                                 ▼
+          ┌───────────────────┐             ┌───────────────────┐
+          │ EMAIL ANALYSIS    │             │ ATTACHMENT        │
+          │                   │             │ ANALYSIS           │
+          │ SPF / DKIM / DMARC│             │ File Type          │
+          │ Headers           │             │ Magic Bytes        │
+          │ Sender IP         │             │ SHA-256            │
+          │ Domain            │             │ YARA               │
+          │ URLs              │             │ PE Analysis        │
+          │ Social Engineering│             │ Entropy            │
+          │ Metadata          │             │ Macros             │
+          │ Impersonation     │             │ Embedded Objects   │
+          └─────────┬─────────┘             └─────────┬─────────┘
+                    │                                 │
+                    ▼                                 ▼
+             ┌────────────┐                   ┌──────────────┐
+             │ Trust Score│                   │ Threat Score │
+             └─────┬──────┘                   └──────┬───────┘
+                   │                                  │
+                   │                         ┌────────▼────────┐
+                   │                         │ Threat           │
+                   │                         │ Intelligence     │
+                   │                         └────────┬─────────┘
+                   │                                  │
+                   │                         ┌────────▼─────────┐
+                   │                         │ Dynamic Sandbox  │
+                   │                         │     (Future)     │
+                   │                         └────────┬─────────┘
+                   │                                  │
+                   └────────────────┬─────────────────┘
                                     ▼
-                         ┌─────────────────────┐
-                         │ CORRELATION ENGINE  │
-                         │                     │
-                         │ Unified Risk Score  │
-                         └──────────┬──────────┘
+                         ┌──────────────────────┐
+                         │  CORRELATION ENGINE  │
+                         │                      │
+                         │ Unified Risk Score   │
+                         └──────────┬───────────┘
                                     │
                                     ▼
-                         ┌─────────────────────┐
-                         │ AI SECURITY ANALYST │
-                         │                     │
-                         │ Explanation         │
-                         │ Correlation         │
-                         │ Recommendations     │
-                         └──────────┬──────────┘
+                         ┌──────────────────────┐
+                         │  AI SECURITY ANALYST │
+                         │                      │
+                         │ Explanation          │
+                         │ Correlation           │
+                         │ Recommendations      │
+                         └──────────┬───────────┘
                                     │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-             ┌────────────┐  ┌────────────┐  ┌────────────┐
-             │   REPORT   │  │    IOCs    │  │  ACTIONS   │
-             │  GENERATOR │  │   EXPORT   │  │            │
-             └────────────┘  └────────────┘  └────────────┘
+                     ┌──────────────┼──────────────┐
+                     ▼              ▼              ▼
+              ┌────────────┐ ┌──────────┐ ┌─────────────┐
+              │   REPORT   │ │   IOCs   │ │   ACTIONS   │
+              │  GENERATOR │ │  EXPORT  │ │             │
+              └────────────┘ └──────────┘ └─────────────┘
 ```
-
-The unified architecture is intentionally designed so that the email and attachment engines operate in parallel before their results are fused by the correlation engine.
 
 ---
 
@@ -753,6 +1084,8 @@ The unified architecture is intentionally designed so that the email and attachm
 │   │   ├── email_analysis/
 │   │   ├── attachment_analysis/
 │   │   ├── threat_intel/
+│   │   ├── sandbox/
+│   │   ├── classification/
 │   │   ├── correlation/
 │   │   ├── ai/
 │   │   ├── reporting/
@@ -781,82 +1114,199 @@ The unified architecture is intentionally designed so that the email and attachm
 
 # 🔄 End-to-End Investigation Workflow
 
+The intended complete workflow is:
+
 ```text
-1. Email arrives
+1. Email arrives in Gmail
         ↓
-2. Email appears in Inbox
+2. Gmail API retrieves email
         ↓
-3. Analyst selects email
+3. Email appears in Inbox
         ↓
-4. Email Analysis Engine starts
+4. Analyst selects email
         ↓
-5. Authentication / Header / URL /
+5. Email Analysis Engine starts
+        ↓
+6. Authentication / Header / URL /
    Domain / Content / Metadata checks
         ↓
-6. Trust Score generated
+7. Email Trust Score generated
         ↓
-7. Attachment extracted
+8. Attachment detected
         ↓
-8. Malware Analysis Engine starts
+9. Analyst opens Malware Analyzer
         ↓
-9. Static analysis + YARA +
-   Hash + File analysis
+10. Attachment retrieved securely
         ↓
-10. Threat Score generated
+11. Attachment placed in isolated
+    temporary analysis environment
         ↓
-11. Evidence correlation
+12. Static malware analysis
         ↓
-12. Composite Risk Score
+13. YARA + Hash + File analysis
         ↓
-13. AI-assisted explanation
+14. Threat Intelligence lookup
         ↓
-14. DFIR report generated
+15. Threat Classification
         ↓
-15. IOCs extracted
+16. Threat Score generated
         ↓
-16. Recommended response actions
+17. Optional Dynamic Sandbox
+    (future capability)
+        ↓
+18. Behavioral analysis
+        ↓
+19. Behavioral IOCs
+        ↓
+20. Evidence correlation
+        ↓
+21. Composite Risk Score
+        ↓
+22. AI-assisted explanation
+        ↓
+23. DFIR report generated
+        ↓
+24. IOCs extracted
+        ↓
+25. Recommended response actions
 ```
 
-All artifacts can be associated with the same Case ID to maintain a consistent investigation and audit trail.
+All artifacts should be associated with the same **Case ID** to maintain a consistent investigation and audit trail.
 
 ---
 
-# 🎯 Hackathon MVP
+# 🎯 Current Development Status
 
-The initial prototype should prioritize a working end-to-end flow rather than implementing every advanced feature.
+The project is being developed incrementally, starting with the email-analysis pipeline and expanding into malware analysis and DFIR correlation.
 
-### MVP
+## Currently Implemented
 
-* [x] Email ingestion / `.eml` upload
-* [x] Email parsing
-* [x] Header analysis
-* [x] SPF/DKIM/DMARC checks
-* [x] Sender/IP analysis
-* [x] URL/domain analysis
-* [x] Phishing/social-engineering detection
-* [x] Attachment extraction
-* [x] File-type validation
-* [x] SHA-256 hashing
-* [x] YARA scanning
-* [x] Basic threat-intelligence lookup
-* [x] Email Trust Score
-* [x] Attachment Threat Score
-* [x] Unified Composite Risk Score
-* [x] Explainable findings
-* [x] IOC extraction
-* [x] DFIR-style report generation
-* [ ] Gmail / Outlook live integration
-* [ ] Dynamic sandbox
-* [ ] Advanced ML classifier
-* [ ] Automated quarantine
+```text
+[x] Website / Security Dashboard
+[x] Gmail API Integration
+[x] Gmail Inbox Retrieval
+[x] Email Display
+[x] Attachment Detection
+[x] Email Selection
+[x] Email Analysis Workflow
+[x] Email Security Checks
+[x] Email Trust Scoring
+```
 
-The hackathon framework specifically recommends prioritizing header parsing, IP reputation, YARA classification, scoring, and report generation, while deferring sandboxing to future work.
+## Currently Under Development
+
+```text
+[ ] Malware Analyzer
+[ ] Secure Attachment Retrieval
+[ ] Isolated Temporary Analysis Environment
+[ ] Static Malware Analysis
+[ ] YARA Classification Engine
+[ ] Malware Threat Classification
+[ ] Threat Score
+[ ] Threat Intelligence Integration
+[ ] Email + Malware Correlation
+[ ] Composite Risk Score
+[ ] DFIR Report Generation
+```
+
+## Future Development
+
+```text
+[ ] Dynamic Malware Sandbox
+[ ] Behavioral Analysis
+[ ] Process Monitoring
+[ ] Network Monitoring
+[ ] Behavioral IOC Extraction
+[ ] Advanced ML Classification
+[ ] Automated Quarantine
+[ ] SOC Integration
+[ ] Threat Intelligence Sharing
+[ ] Organization-wide Threat Dashboard
+```
+
+---
+
+# 🏆 Hackathon Development Strategy
+
+The project is being developed as an incremental end-to-end security platform.
+
+### Phase 1 — Email Security
+
+```text
+Gmail API
+   ↓
+Inbox
+   ↓
+Email Analysis
+   ↓
+Trust Score
+```
+
+### Phase 2 — Malware Analysis
+
+```text
+Attachment
+   ↓
+Isolated Analysis Environment
+   ↓
+Static Analysis
+   ↓
+YARA
+   ↓
+Threat Classification
+   ↓
+Threat Score
+```
+
+### Phase 3 — Correlation
+
+```text
+Email Trust Score
+       +
+Malware Threat Score
+       +
+Threat Intelligence
+       ↓
+Composite Risk Score
+```
+
+### Phase 4 — DFIR
+
+```text
+Evidence
+   ↓
+AI Security Analyst
+   ↓
+IOC Extraction
+   ↓
+DFIR Report
+   ↓
+Recommended Actions
+```
+
+### Phase 5 — Advanced Sandbox
+
+```text
+Malware
+   ↓
+Isolated VM
+   ↓
+Controlled Execution
+   ↓
+Behavior Monitoring
+   ↓
+Behavioral IOCs
+   ↓
+Threat Classification
+```
+
+This approach allows the project to demonstrate a working system even before advanced dynamic malware analysis is introduced.
 
 ---
 
 # 🔮 Future Enhancements
 
-## 🧪 Dynamic Malware Sandbox
+## 🧪 Advanced Dynamic Malware Sandbox
 
 Add isolated execution and behavioral analysis for suspicious attachments.
 
@@ -870,45 +1320,69 @@ Dropped Files
 Registry Changes
 Persistence
 C2 Infrastructure
+Memory Indicators
+Behavioral IOCs
 ```
 
 ---
 
-## 🤖 ML-Based Phishing Detection
+# 🤖 ML-Based Phishing Detection
 
-Train/fine-tune a phishing classifier to complement deterministic rules.
+Train or fine-tune a phishing classifier to complement deterministic security rules.
 
-Possible approach:
+Possible architecture:
 
 ```text
 Email Body
-     ↓
+    ↓
 Transformer / NLP Model
-     ↓
+    ↓
 Phishing Probability
-     ↓
+    ↓
 Risk Engine
 ```
 
 ---
 
-## 🌐 Real-Time Threat Intelligence
+# 🧬 Advanced Malware Classification
 
-Integrate:
+Combine:
+
+```text
+Static Features
+      +
+YARA
+      +
+Threat Intelligence
+      +
+Dynamic Behavior
+      +
+Historical Samples
+      ↓
+Malware Classification
+```
+
+This can improve classification beyond relying solely on file signatures.
+
+---
+
+# 🌐 Real-Time Threat Intelligence
+
+Potential integrations:
 
 * MISP
 * OTX
 * VirusTotal
 * AbuseIPDB
-* Other organizational/commercial feeds
-
-The enhancement framework recommends external threat-intelligence integration so detection is not limited to historical organizational data.
+* MalwareBazaar
+* Commercial threat-intelligence feeds
+* Internal organizational IOC repositories
 
 ---
 
-## 🔁 Analyst Feedback Loop
+# 🔁 Analyst Feedback Loop
 
-Allow analysts to select:
+Allow analysts to provide feedback:
 
 ```text
 ✓ Correct Detection
@@ -918,13 +1392,19 @@ Allow analysts to select:
 ✗ False Negative
 ```
 
-Feedback can later be used to tune scoring weights and improve detection.
+Feedback can later be used to tune:
+
+* Risk thresholds
+* Detection rules
+* Scoring weights
+* ML models
+* Organization-specific policies
 
 ---
 
-## 🏢 Organization-Specific Policies
+# 🏢 Organization-Specific Policies
 
-Allow organizations to configure:
+Organizations can configure:
 
 * Risk thresholds
 * Trusted domains
@@ -932,31 +1412,57 @@ Allow organizations to configure:
 * False-positive tolerance
 * Scoring weights
 * Automatic response policies
+* Threat-intelligence sharing policies
 
-## Different organizations may require different detection sensitivities and thresholds.
+Different organizations may require different detection sensitivities and response workflows.
+
+---
+
+# 🚨 Automated Response
+
+Future versions can integrate with organizational security systems to support actions such as:
+
+```text
+High Risk
+   ↓
+Quarantine Email
+   ↓
+Block Sender / Domain / IOC
+   ↓
+Alert SOC
+   ↓
+Search Organization for Matching IOC
+```
+
+Medium-risk cases can be placed into analyst review, while low-risk cases can be logged and delivered according to organizational policy.
+
+---
 
 # 🔐 Security Considerations
 
 This project is intended for **authorized security analysis and controlled environments**.
 
-Important design principles:
+Important security principles:
 
-* Never execute untrusted attachments directly on the host.
+* Never execute untrusted attachments directly on the application host.
 * Use isolated environments for dynamic analysis.
-* Do not expose malware samples through public web endpoints.
 * Restrict sandbox networking.
-* Store sensitive mailbox credentials securely.
-* Use read-only mailbox access where possible.
-* Sanitize uploaded files and metadata.
-* Keep investigation artifacts associated with Case IDs.
-* Maintain audit logs for security investigations.
+* Do not expose malware samples through public web endpoints.
+* Store temporary samples securely.
+* Automatically clean up temporary analysis files according to retention policy.
+* Store mailbox credentials securely.
+* Use least-privilege mailbox permissions where possible.
 * Never expose API keys in frontend code.
+* Sanitize uploaded files and metadata.
+* Associate investigation artifacts with Case IDs.
+* Maintain audit logs for security investigations.
+* Keep the analysis environment separated from production infrastructure.
 
 ---
 
 # 📊 Example Detection Scenario
 
-### Incoming Email
+## Incoming Email
 
 ```text
 From:
@@ -966,7 +1472,7 @@ Subject:
 URGENT: Your account will be suspended
 ```
 
-### Email Analysis
+## Email Analysis
 
 ```text
 SPF                  ✗ FAIL
@@ -980,16 +1486,19 @@ Social Engineering   ✗ DETECTED
 
 ```text
 Email Trust Score:
+
 18 / 100
 ```
 
-### Attachment
+## Attachment
 
 ```text
 invoice.pdf.exe
 ```
 
-Analysis:
+The attachment is securely transferred to the isolated analysis environment.
+
+### Static Analysis
 
 ```text
 Extension Check      ✗ FAIL
@@ -997,15 +1506,40 @@ Magic Bytes          ✗ PE
 SHA-256              Generated
 YARA                 ✗ 3 MATCHES
 Entropy              ⚠ HIGH
+Digital Signature    ✗ INVALID
 Reputation           ✗ MALICIOUS
 ```
 
 ```text
 Threat Score:
+
 96 / 100
 ```
 
-### Correlation
+## Optional Dynamic Analysis
+
+If dynamic sandboxing is enabled:
+
+```text
+Process Created:
+powershell.exe
+
+File Activity:
+Suspicious executable dropped
+
+Network:
+Outbound connection detected
+
+Persistence:
+Persistence attempt detected
+
+Behavior:
+Potential downloader activity
+```
+
+These observations become additional behavioral evidence.
+
+## Correlation
 
 ```text
 Email Trust
@@ -1013,6 +1547,8 @@ Email Trust
 Attachment Threat
      +
 Threat Intelligence
+     +
+Behavioral Evidence
      ↓
 Composite Risk
      ↓
@@ -1021,27 +1557,31 @@ Composite Risk
 🔴 MALICIOUS
 ```
 
-### Final Recommendation
+## Final Recommendation
 
 ```text
 • Quarantine the email
-• Block associated malicious infrastructure
-• Search for matching SHA-256 across endpoints
-• Investigate other recipients
-• Reset credentials if credential harvesting occurred
-• Preserve the email and attachment as investigation evidence
+• Preserve the email and attachment as evidence
+• Search endpoints for the matching SHA-256
+• Search the mailbox for similar attachments
+• Investigate associated domains/IPs
+• Block confirmed malicious infrastructure
+• Review potentially affected users
+• Initiate incident-response procedures if compromise is confirmed
 ```
 
 ---
 
 # 📈 Project Vision
 
-The long-term goal is to evolve this prototype into an **analyst-centric email threat investigation platform** capable of moving from:
+The long-term goal is to evolve this prototype into an **analyst-centric email threat investigation and DFIR platform** capable of moving from:
 
 ```text
 Detection
    ↓
 Analysis
+   ↓
+Threat Classification
    ↓
 Correlation
    ↓
@@ -1049,71 +1589,9 @@ Risk Assessment
    ↓
 Response
    ↓
+Threat Intelligence
+   ↓
 DFIR Evidence
 ```
 
-The platform can eventually provide SOC teams with organization-wide dashboards for campaign clustering, targeted users, malware families, recurring infrastructure, and historical investigations.
-
----
-
-# 👥 Intended Users
-
-* SOC Analysts
-* DFIR Analysts
-* Incident Responders
-* Security Operations Teams
-* Cybersecurity Researchers
-* Enterprise Security Teams
-* Security Students / Training Labs
-
----
-
-# ⚠️ Project Status
-
-> 🚧 **Prototype / Hackathon Project**
-
-The current implementation focuses on demonstrating the integrated detection and DFIR workflow. Advanced capabilities such as full mailbox integration, dynamic sandboxing, large-scale ML classification, and automated response are planned enhancements.
-
----
-
-# 📚 Project Documentation
-
-The architecture and feature design of this project are based on the following internal project frameworks:
-
-* **Phishing Email & Malware Attachment Forensic Scanner — Hackathon Framework**
-* **Unified Phishing Email & Malware Attachment Detection Framework**
-* **Module 1 & 2 Enhancement Parameters Addendum**
-
-These documents define the core email-analysis, attachment-analysis, correlation, reporting, threat-intelligence, explainability, and future-enhancement requirements used to guide the project.
-
----
-
-# ⚡ Quick Concept
-
-```text
-                    📧 EMAIL
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
-   🔍 EMAIL FORENSICS        🦠 MALWARE ANALYSIS
-          │                         │
-          ▼                         ▼
-    TRUST SCORE              THREAT SCORE
-          │                         │
-          └────────────┬────────────┘
-                       ▼
-                🔗 CORRELATION
-                       │
-                       ▼
-               🎯 RISK SCORE
-                       │
-                       ▼
-                🤖 AI ANALYST
-                       │
-             ┌─────────┼─────────┐
-             ▼         ▼         ▼
-          📄 REPORT   IOCs    🚨 RESPONSE
-```
-
-> **Detect. Correlate. Explain. Respond.**
+The platform
