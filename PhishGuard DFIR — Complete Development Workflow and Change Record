@@ -1,0 +1,951 @@
+1. Project objective
+
+PhishGuard began as a hackathon solution for detecting phishing emails and
+malicious attachments. The intended product combined:
+
+live Gmail ingestion;
+
+email-header and content analysis;
+
+machine-learning phishing classification;
+
+attachment risk identification;
+
+a combined explainable risk score;
+
+DFIR-style reports and recommended actions; and
+
+future integration with YARA, threat intelligence and a sandbox.
+
+The project was deliberately implemented as a safe prototype. It reads email
+through Gmail's API, but it does not visit URLs, execute attachments or detonate
+malware.
+
+2. Final architecture
+
+flowchart TD
+    A["Test Gmail inbox"] -->|"OAuth read-only"| B["FastAPI backend v2.4"]
+    B --> C["MIME and header parser"]
+    C --> D["Rule-based checks"]
+    C --> E["ML text classifier"]
+    D --> F["Combined score and verdict"]
+    E --> F
+    F --> G["SQLite scan history"]
+    F --> H["React PhishGuard interface"]
+    I["Raw MBOX corpus"] -->|"Offline adapter"| C
+
+The two main application layers are:
+
+Frontend: React/Vinext interface containing Inbox, Email Analysis,
+Malware Analyser, Risk Assessment and Reports.
+
+Backend: Python/FastAPI Gmail connector, MIME parser, detection engine,
+ML inference service and SQLite history store.
+
+3. Stage-by-stage development history
+
+Stage 1 — Problem definition and functional design
+
+The original scope separated the tool into two principal scanners.
+
+Email scanner
+
+The proposed indicators included:
+
+fake or impersonated senders;
+
+email-header inconsistencies;
+
+sender IP and routing information;
+
+metadata extraction;
+
+typosquatting and lookalike domains;
+
+urgency and social-engineering language;
+
+credential, OTP and personal-data requests;
+
+URL analysis;
+
+sender-authentication results; and
+
+an overall trust or risk score.
+
+Attachment scanner
+
+The proposed checks included:
+
+extension and file-type validation;
+
+double-extension detection;
+
+hashes and reputation;
+
+YARA classification;
+
+Trojan, worm, ransomware, RAT, APT, botnet and fileless indicators; and
+
+eventual isolated sandbox execution.
+
+The first interface design used five modules:
+
+Inbox
+
+Email Analysis
+
+Malware Analyser
+
+Risk Assessment
+
+Reports
+
+At this stage the interface used controlled demonstration data. Gmail OAuth,
+live message retrieval and real sandboxing were not yet connected.
+
+Stage 2 — Frontend implementation
+
+The PhishGuard dashboard was implemented as a React/Vinext Site. The visual
+experience included:
+
+a dark forensic/security dashboard;
+
+message list and preview panel;
+
+risk dots, score badges and Pending status;
+
+animated security checks;
+
+evidence-based recommendations;
+
+attachment-analysis workflow;
+
+composite risk presentation; and
+
+downloadable incident-report content.
+
+The principal frontend files were:
+
+File
+
+Purpose
+
+app/page.tsx
+
+All five modules, live Gmail state, message conversion, analysis calls, reports and interactions
+
+app/globals.css
+
+Complete PhishGuard visual design and responsive styling
+
+app/layout.tsx
+
+Application metadata and root layout
+
+components/ui/
+
+Reusable interface controls
+
+public/favicon.svg
+
+PhishGuard browser icon
+
+package.json
+
+Frontend dependencies and development/build commands
+
+The deployed private Site remained available at the same PhishGuard URL while
+later changes were published.
+
+Stage 3 — Gmail OAuth and local connector
+
+The next goal was to test one real Gmail account rather than an organisation-
+wide deployment.
+
+The Google Cloud setup involved:
+
+enabling the Gmail API;
+
+configuring the OAuth consent screen in testing mode;
+
+adding the test Gmail account as an OAuth test user;
+
+creating an OAuth Desktop client;
+
+downloading credentials.json; and
+
+completing the browser authorization flow to create token.json.
+
+The OAuth scope used by the scanner is:
+
+https://www.googleapis.com/auth/gmail.readonly
+
+This permits reading but not sending, deleting or modifying email. When the
+original sole-owner/test account was suspended, the OAuth project and
+credentials had to be replaced and the account authorized again.
+
+A local FastAPI service was introduced because the published frontend could not
+directly store Gmail secrets. The backend runs with:
+
+uvicorn api:app --reload
+
+It exposes:
+
+Endpoint
+
+Purpose
+
+GET /
+
+Health, backend version, model state and capabilities
+
+GET /api/messages
+
+Gmail Inbox metadata and saved scan status
+
+GET /api/messages/{message_id}/analysis
+
+Cached or fresh analysis of one message
+
+CORS and private-network headers allow the browser interface to communicate
+with the connector on 127.0.0.1:8000 while OAuth credentials remain on the
+computer.
+
+Stage 4 — Live Gmail message analysis
+
+The backend retrieves Gmail message metadata for the Inbox and retrieves the
+full selected message only when analysis is requested. It parses raw Gmail MIME
+structures, including nested parts, plain text, HTML, headers and attachment
+names.
+
+The initial live analyser contained 12 rule-based checks. Machine learning was
+later added as the thirteenth check.
+
+The current 13 checks are:
+
+SPF Verification
+
+DKIM Verification
+
+DMARC Alignment
+
+Header Address Consistency
+
+Sender Route & IP
+
+Sender Domain Safety
+
+Machine-Learning Classification
+
+URL & Redirect Indicators
+
+Urgency & Pressure Language
+
+Sensitive-Data Request
+
+Attachment Type Safety
+
+Hidden HTML Content
+
+Message-ID Structure
+
+The system extracts and displays evidence but deliberately does not:
+
+open links;
+
+follow redirects;
+
+download attachment bodies;
+
+execute files; or
+
+render untrusted HTML.
+
+Stage 5 — Machine-learning model
+
+A text-classification model was trained using public phishing and legitimate
+email data derived from the Nazario and Enron corpora. The saved model is:
+
+models/phishing_model.joblib
+
+The model evaluates the combined subject and plain-text body and returns:
+
+predicted class;
+
+phishing probability;
+
+confidence; and
+
+risk band.
+
+The earlier internal train/test result was approximately 98.88%, but this
+was treated only as an internal figure because related corpus data could appear
+in both model development and later demonstrations.
+
+Stage 6 — Independent sample validation
+
+Because the proposed external Zenodo validation download was inaccessible, a
+separate controlled dataset was created:
+
+validation_data/phishguard_sample_emails.csv
+
+It contains:
+
+25 legitimate samples;
+
+25 phishing samples;
+
+subject and body;
+
+combined model text;
+
+numeric label; and
+
+label name.
+
+The validation script is:
+
+validate_model.py
+
+It calculates accuracy, precision, recall, F1, a confusion matrix and all
+incorrect classifications, and writes detailed results to
+validation_results.csv.
+
+The independent controlled-set results were:
+
+Metric
+
+Result
+
+Samples
+
+50
+
+Correct
+
+43
+
+Accuracy
+
+86.00%
+
+Precision
+
+87.50%
+
+Recall
+
+84.00%
+
+F1 score
+
+85.71%
+
+False positives
+
+3
+
+False negatives
+
+4
+
+The missed phishing samples were mainly business-email-compromise messages
+without malicious links, such as executive-transfer and gift-card requests.
+This established that rule-based context remains important even when the model
+probability is low.
+
+Stage 7 — Risk-score recalibration: backend v2.2
+
+The initial ML contribution was not strong enough to move high-confidence
+phishing content into a high-risk verdict when SPF, DKIM and DMARC passed.
+
+The model weighting was therefore recalibrated:
+
+ML phishing probability
+
+Risk points
+
+85% or higher
+
+50
+
+60%–84.99%
+
+25
+
+40%–59.99%
+
+10
+
+Below 40%
+
+0
+
+The overall score is capped at 100. Current verdict thresholds are:
+
+Score
+
+Verdict
+
+Severity
+
+80–100
+
+Malicious
+
+Critical
+
+50–79
+
+Malicious
+
+High
+
+20–49
+
+Suspicious
+
+Medium
+
+0–19
+
+Low risk
+
+Safe
+
+This was released as backend v2.2. A high-confidence example with 88.35% ML
+probability was expected to reach approximately 62/100, or Malicious/High,
+while still showing that sender authentication had passed.
+
+Stage 8 — Controlled live-email testing
+
+Legitimate and simulated phishing messages were sent between test Gmail
+accounts. Tests used only reserved example.com URLs and no real malware.
+
+An early comparison produced:
+
+legitimate mail: 0/100, Low risk;
+
+phishing-style mail: 37/100, Suspicious.
+
+The phishing sample remained below Malicious because it originated from a real
+Gmail account, so SPF, DKIM and DMARC passed, and a defanged hxxps link was not
+recognized as a normal URL. This became an important demonstration point:
+
+An authenticated sender can still send malicious content. Authentication
+validates infrastructure and domain alignment; it does not prove benign
+intent.
+
+A reusable safe-email pack was created:
+
+gmail_phishing_test_pack.csv
+
+It includes credential theft, executive fraud, gift cards, payroll, MFA/OTP,
+invoice, KYC, delivery, HR and vendor-payment scenarios, plus legitimate
+controls.
+
+An automated Gmail sender was also created:
+
+send_phishing_tests.py
+
+It uses the gmail.send OAuth scope, a separate sender_token.json, reserved
+example.com URLs and no attachments. It was restricted to the controlled test
+recipient in the project version. This utility is for authorized testing only.
+
+Stage 9 — Offline Jose Nazario MBOX analysis
+
+The Jose Nazario Phishing Corpus was added as an offline pipeline stress test.
+It was not used as independent accuracy evidence because Nazario-derived data
+had already contributed to model training.
+
+The adapter is:
+
+analyze_mbox.py
+
+Its workflow is:
+
+open the raw MBOX without rendering it;
+
+parse headers and MIME parts;
+
+extract text, HTML structure and attachment names;
+
+convert the message into the Gmail-like dictionary accepted by
+analyse_message();
+
+run the same 13-check pipeline; and
+
+save CSV summary and JSONL detail files.
+
+The outputs are:
+
+offline_results/nazario/nazario_analysis_summary.csv
+offline_results/nazario/nazario_analysis_details.jsonl
+
+Full-corpus results were:
+
+Result
+
+Count
+
+Percentage of analysed mail
+
+Successfully analysed
+
+2,274
+
+99.78% processing success
+
+Malicious
+
+1,049
+
+46.13%
+
+Suspicious
+
+1,006
+
+44.24%
+
+Low risk
+
+219
+
+9.63%
+
+Parsing errors
+
+5
+
+0.22%
+
+Flagged as malicious or suspicious
+
+2,055
+
+90.37% detection coverage
+
+The correct description is 90.37% corpus detection coverage, not independent
+accuracy.
+
+The investigation of early low-risk cases exposed known gaps:
+
+sparse or incomplete messages;
+
+missing subject or URL evidence;
+
+brand impersonation without existing trigger words;
+
+IP-address or unusual URL patterns;
+
+lookalike-domain logic; and
+
+low ML confidence on business-email-compromise language.
+
+These cases were retained as limitations rather than used to overfit the model.
+
+Stage 10 — Reports-page enhancement
+
+The deployed Reports module was updated with a Nazario batch-analysis panel
+showing:
+
+2,274 successfully analysed messages;
+
+1,049 malicious;
+
+1,006 suspicious;
+
+219 low risk;
+
+five parsing errors;
+
+90.37% detection coverage; and
+
+99.78% processing success.
+
+The report explicitly states that the corpus figure is pipeline coverage, not
+independent accuracy. The Export Report output was also expanded to include the
+batch statistics.
+
+Stage 11 — Persistent scan history: backend v2.3
+
+The next problem was that every message returned to Pending after an Inbox
+refresh or backend restart. This made a mailbox with dozens of messages
+impractical because the user appeared to need to analyse everything again.
+
+Backend v2.3 introduced:
+
+scan_history.db
+
+This SQLite database stores:
+
+Gmail message ID;
+
+scan timestamp;
+
+score;
+
+verdict;
+
+severity; and
+
+complete analysis JSON.
+
+The Gmail message ID is the persistent key. The behavior became:
+
+unseen messages: PENDING;
+
+previously analysed messages: saved score and verdict;
+
+View saved analysis: return cached evidence without rescanning;
+
+Run again: call the analysis endpoint with force=true and replace the
+saved result.
+
+Messages analysed before installing v2.3 required one final scan because no
+historical database record existed for them.
+
+Stage 12 — Complete-Inbox pagination: backend v2.4
+
+The v2.3 endpoint still contained:
+
+maxResults=20
+
+Therefore the interface could never show more than the newest 20 Inbox
+messages. The frontend itself could render more, so the limitation was entirely
+inside api.py.
+
+Backend v2.4 changed /api/messages to:
+
+request up to 500 Gmail references per page;
+
+follow every nextPageToken until Gmail returns no further page;
+
+collect every message carrying the INBOX label;
+
+fetch its display metadata; and
+
+attach any saved SQLite scan summary.
+
+The history lookup was also divided into 500-ID batches so a large Inbox would
+not exceed SQLite's bound-parameter limit.
+
+The health endpoint now reports:
+
+{
+  "version": "2.4",
+  "scan_history": "persistent",
+  "inbox_loading": "all_messages"
+}
+
+During installation, Windows repeatedly loaded an older local api.py. A
+uniquely named api_v24.py was temporarily provided and started with:
+
+uvicorn api_v24:app --reload
+
+This bypassed the stale file. In the final VS Code package, the canonical file
+is once again backend/api.py, and it contains v2.4.
+
+Stage 13 — Standalone VS Code project
+
+The hosted and local work was consolidated into:
+
+phishguard-vscode.zip
+
+The package contains 117 source/support files and was validated by:
+
+Python syntax compilation;
+
+TypeScript compilation;
+
+a complete frontend production build;
+
+ZIP integrity testing; and
+
+a scan for OAuth secrets, Gmail tokens, databases and common credential
+patterns.
+
+The package deliberately excludes:
+
+credentials.json;
+
+token.json;
+
+sender_token.json;
+
+scan_history.db;
+
+the user's Gmail content;
+
+raw MBOX files; and
+
+phishing_model.joblib.
+
+The existing model and OAuth client must be copied into the local project by
+the authorized user.
+
+4. Current VS Code file structure
+
+phishguard-vscode/
+├── README.md
+├── SECURITY.md
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx
+│   │   ├── globals.css
+│   │   └── layout.tsx
+│   ├── components/ui/
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/
+│   ├── api.py
+│   ├── authorize_gmail.py
+│   ├── train_model.py
+│   ├── validate_model.py
+│   ├── analyze_mbox.py
+│   ├── requirements.txt
+│   ├── models/
+│   │   └── phishing_model.joblib
+│   └── validation_data/
+│       └── phishguard_sample_emails.csv
+└── tools/
+    └── gmail_phishing_test_pack.csv
+
+Runtime-created local files are:
+
+File
+
+Purpose
+
+backend/credentials.json
+
+Google OAuth Desktop client configuration
+
+backend/token.json
+
+Read-only Gmail authorization
+
+backend/scan_history.db
+
+Persistent analysis results
+
+backend/models/phishing_model.joblib
+
+Trained ML pipeline
+
+All four must be protected. The token, credentials and database must never be
+committed to a public repository.
+
+5. Current end-to-end operating workflow
+
+Application startup
+
+Backend terminal:
+
+cd backend
+venv\Scripts\activate
+uvicorn api:app --reload --port 8000
+
+Frontend terminal:
+
+cd frontend
+npm run dev
+
+Inbox workflow
+
+The frontend calls GET /api/messages.
+
+The backend obtains every Gmail Inbox page.
+
+It retrieves display metadata for each message.
+
+SQLite adds saved scan state where available.
+
+The frontend displays saved verdicts or Pending.
+
+Analysis workflow
+
+The user selects a message.
+
+The frontend calls the message-analysis endpoint.
+
+The backend returns a cached result unless a forced rerun was requested.
+
+A fresh scan retrieves the complete Gmail message.
+
+MIME text, HTML, headers and attachment names are extracted.
+
+The 12 rules and one ML classifier run.
+
+Points are combined and capped at 100.
+
+A verdict, severity, evidence and recommendations are returned.
+
+The result is stored in SQLite.
+
+The frontend animates and displays the evidence.
+
+Offline MBOX workflow
+
+The raw corpus stays offline.
+
+analyze_mbox.py adapts each message into the same internal format.
+
+The same detection engine runs without Gmail.
+
+CSV and JSONL evidence files are produced for batch review.
+
+6. What is fully implemented versus demonstrated
+
+Capability
+
+Current state
+
+Gmail OAuth
+
+Implemented; read-only local authorization
+
+Full Gmail Inbox loading
+
+Implemented in v2.4
+
+MIME/header/body parsing
+
+Implemented
+
+SPF/DKIM/DMARC interpretation
+
+Implemented from received headers
+
+Content and social-engineering rules
+
+Implemented
+
+ML text classification
+
+Implemented when model file is present
+
+Explainable scoring
+
+Implemented
+
+Persistent scan results
+
+Implemented in SQLite
+
+Offline MBOX batch analysis
+
+Implemented
+
+Report interface/export
+
+Implemented for the prototype
+
+Attachment filename/type checks
+
+Implemented
+
+Attachment byte download
+
+Not implemented
+
+Hash/reputation services
+
+Not implemented
+
+YARA scanning
+
+Demonstrated in UI; not connected to backend
+
+CAPE/Cuckoo detonation
+
+Demonstrated in UI; not connected
+
+Domain age/reputation
+
+Not implemented
+
+Redirect following
+
+Not implemented
+
+Enterprise authentication/RBAC
+
+Not implemented
+
+7. Main risks and safeguards
+
+Gmail privacy
+
+The read-only token can still expose sensitive mailbox content. Use a dedicated
+test account and revoke access when testing is complete.
+
+Local API exposure
+
+The FastAPI service has no user authentication. It must remain on
+127.0.0.1; it should not be exposed with --host 0.0.0.0, a public tunnel or
+an open proxy.
+
+False positives and false negatives
+
+The score supports analyst triage; it is not proof. No automated blocking,
+credential reset or disciplinary action should be based solely on the prototype
+verdict.
+
+Dangerous datasets
+
+Historical corpora can contain active links or malware. Do not click links,
+render HTML, extract files or forward corpus messages through Gmail.
+
+Data retention
+
+scan_history.db can contain message-derived evidence. Protect it, define a
+retention period and delete it when no longer needed.
+
+Test-email reputation
+
+Sending large volumes of phishing-like content may trigger provider anti-abuse
+systems. Use small authorized batches only between accounts under the team's
+control.
+
+8. Accurate hackathon positioning
+
+A defensible description is:
+
+PhishGuard is an explainable phishing-analysis and DFIR prototype that
+combines live read-only Gmail ingestion, 12 forensic/content rules, a text
+classifier, persistent scan history and offline MBOX processing. It reached
+86% accuracy on a separate controlled 50-message validation set and flagged
+90.37% of the analysable Nazario corpus during pipeline stress testing. The
+Nazario figure is detection coverage, not independent accuracy.
+
+The key demonstration message is that email authentication alone is not enough:
+SPF, DKIM and DMARC may all pass for a compromised or malicious authenticated
+sender, while content, request context, URLs and ML signals still indicate risk.
+
+9. Recommended next improvements
+
+Add safe URL canonicalization, redirect tracing and domain-age/reputation
+enrichment.
+
+Add brand/lookalike detection using edit distance and a protected brand list.
+
+Add an isolated attachment-download service with hashes, magic bytes and
+antivirus/YARA scanning.
+
+Connect a real CAPE or Cuckoo sandbox through a separate restricted worker.
+
+Introduce authenticated users, RBAC, encryption and audit logs.
+
+Load very large mailboxes incrementally while preserving complete search.
+
+Validate on recent, licensed, independently held-out phishing campaigns.
+
+Add analyst disposition and feedback for controlled model improvement.
+
+Current state: PhishGuard v2.4 is operational for controlled local Gmail
+testing, complete-Inbox viewing, explainable message analysis, saved scan
+history and offline MBOX batch analysis. It is a hackathon prototype and not a
+production email-security gateway.
