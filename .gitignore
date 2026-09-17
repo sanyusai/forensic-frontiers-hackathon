@@ -1,0 +1,36 @@
+# Gmail OAuth secrets and tokens
+**/credentials.json
+**/client_secret*.json
+**/token.json
+**/sender_token.json
+
+# Local analysis data
+**/scan_history.db
+**/scan_history.db-*
+**/offline_data/
+**/offline_results/
+**/validation_results.csv
+
+# Python
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+
+# Frontend
+**/node_modules/
+**/.next/
+**/dist/
+**/.vinext/
+**/.wrangler/
+**/.sites-runtime/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+
+# Local configuration and ML binary
+**/.env
+**/.env.local
+**/*.joblib
