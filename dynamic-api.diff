@@ -1,0 +1,379 @@
+﻿diff --git ".\\backend\\api.py" "C:\\Users\\mehar\\OneDrive\\Desktop\\phishguard-dynamic-analysis-v3.0\\phishguard-dynamic-analysis-v3.0\\backend\\api.py"
+index 873e768..f7166d6 100644
+--- ".\\backend\\api.py"
++++ "C:\\Users\\mehar\\OneDrive\\Desktop\\phishguard-dynamic-analysis-v3.0\\phishguard-dynamic-analysis-v3.0\\backend\\api.py"
+@@ -13,20 +13,23 @@ from urllib.parse import urlparse
+ import joblib
+ from fastapi import FastAPI, HTTPException
+ from fastapi.middleware.cors import CORSMiddleware
++from dotenv import load_dotenv
+ from google.auth.transport.requests import Request
+ from google.oauth2.credentials import Credentials
+ from googleapiclient.discovery import build
+ 
++from dynamic_analyzer import CapeClient, DynamicAnalysisError
+ from static_analyzer import MAX_ATTACHMENT_BYTES, analyze_attachment
+ 
+ 
+ BASE_DIR = Path(__file__).resolve().parent
++load_dotenv(BASE_DIR / ".env")
+ TOKEN_FILE = BASE_DIR / "token.json"
+ MODEL_FILE = BASE_DIR / "models" / "phishing_model.joblib"
+-PDF_MODEL_FILE = BASE_DIR / "models" / "static_pdf_model.joblib"
+ SCAN_HISTORY_FILE = BASE_DIR / "scan_history.db"
+ YARA_RULES_DIR = BASE_DIR / "yara_rules"
+ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
++CAPE_CLIENT = CapeClient()
+ 
+ ALLOWED_ORIGINS = [
+     "http://localhost:3000",
+@@ -54,13 +57,13 @@ DATA_REQUEST_TERMS = {
+ }
+ 
+ 
+-app = FastAPI(title="PhishGuard Gmail Scanner", version="2.6")
++app = FastAPI(title="PhishGuard Gmail Scanner", version="3.0")
+ 
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=ALLOWED_ORIGINS,
+     allow_credentials=False,
+-    allow_methods=["GET", "OPTIONS"],
++    allow_methods=["GET", "POST", "OPTIONS"],
+     allow_headers=["*"],
+ )
+ 
+@@ -133,6 +136,21 @@ def open_scan_history():
+         )
+         """
+     )
++    connection.execute(
++        """
++        CREATE TABLE IF NOT EXISTS dynamic_scans (
++            message_id TEXT NOT NULL,
++            part_id TEXT NOT NULL,
++            task_id TEXT NOT NULL,
++            status TEXT NOT NULL,
++            submitted_at TEXT NOT NULL,
++            updated_at TEXT NOT NULL,
++            analysis_json TEXT,
++            error TEXT,
++            PRIMARY KEY (message_id, part_id)
++        )
++        """
++    )
+     return connection
+ 
+ 
+@@ -260,6 +278,80 @@ def save_attachment_analysis(result: dict[str, Any]) -> dict[str, Any]:
+     return stored_result
+ 
+ 
++def load_dynamic_scan(message_id: str, part_id: str) -> dict[str, Any] | None:
++    with open_scan_history() as connection:
++        row = connection.execute(
++            """
++            SELECT task_id, status, submitted_at, updated_at, analysis_json, error
++            FROM dynamic_scans
++            WHERE message_id = ? AND part_id = ?
++            """,
++            (message_id, part_id),
++        ).fetchone()
++    if row is None:
++        return None
++    return {
++        "message_id": message_id,
++        "part_id": part_id,
++        "task_id": row["task_id"],
++        "status": row["status"],
++        "submitted_at": row["submitted_at"],
++        "updated_at": row["updated_at"],
++        "analysis": json.loads(row["analysis_json"]) if row["analysis_json"] else None,
++        "error": row["error"],
++    }
++
++
++def save_dynamic_scan(
++    message_id: str,
++    part_id: str,
++    task_id: str,
++    status: str,
++    *,
++    submitted_at: str | None = None,
++    analysis: dict[str, Any] | None = None,
++    error: str | None = None,
++) -> dict[str, Any]:
++    now = datetime.now(timezone.utc).isoformat()
++    first_submitted = submitted_at or now
++    with open_scan_history() as connection:
++        connection.execute(
++            """
++            INSERT INTO dynamic_scans (
++                message_id, part_id, task_id, status, submitted_at, updated_at,
++                analysis_json, error
++            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
++            ON CONFLICT(message_id, part_id) DO UPDATE SET
++                task_id = excluded.task_id,
++                status = excluded.status,
++                submitted_at = excluded.submitted_at,
++                updated_at = excluded.updated_at,
++                analysis_json = excluded.analysis_json,
++                error = excluded.error
++            """,
++            (
++                message_id,
++                part_id,
++                task_id,
++                status,
++                first_submitted,
++                now,
++                json.dumps(analysis, ensure_ascii=False) if analysis else None,
++                error,
++            ),
++        )
++    return {
++        "message_id": message_id,
++        "part_id": part_id,
++        "task_id": task_id,
++        "status": status,
++        "submitted_at": first_submitted,
++        "updated_at": now,
++        "analysis": analysis,
++        "error": error,
++    }
++
++
+ def run_ml_analysis(subject: str, body: str) -> dict[str, Any]:
+     if PHISHING_MODEL is None:
+         return {
+@@ -601,26 +693,79 @@ def analyse_message(message: dict[str, Any]) -> dict[str, Any]:
+         "limitations": [
+             "This is a first-stage rule-based and machine-learning assessment, not a final SOC verdict.",
+             "The text model was trained on public Nazario and Enron datasets and requires independent validation against newer email campaigns.",
+-            "IP/domain reputation, domain age, redirect following, YARA, and sandbox detonation are not yet enabled.",
++            "IP/domain reputation, domain age, and redirect following are not enabled in the email-only stage.",
+             "Attachments are identified but are not downloaded or executed by this endpoint.",
+         ],
+     }
+ 
+ 
++def fetch_gmail_attachment(message_id: str, part_id: str) -> tuple[bytes, str, str]:
++    """Retrieve a selected MIME part after the caller has validated both identifiers."""
++    gmail = get_gmail_service()
++    message = gmail.users().messages().get(
++        userId="me", id=message_id, format="full"
++    ).execute()
++    selected_part = next(
++        (
++            part for part in walk_parts(message.get("payload", {}))
++            if str(part.get("partId", "")) == part_id and part.get("filename")
++        ),
++        None,
++    )
++    if selected_part is None:
++        raise HTTPException(status_code=404, detail="Attachment part was not found in this message")
++
++    body = selected_part.get("body", {}) or {}
++    reported_size = int(body.get("size", 0) or 0)
++    if reported_size > MAX_ATTACHMENT_BYTES:
++        raise HTTPException(
++            status_code=413,
++            detail=f"Attachment exceeds the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB analysis limit",
++        )
++
++    encoded_data = body.get("data")
++    attachment_id = body.get("attachmentId")
++    if not encoded_data and attachment_id:
++        attachment_body = gmail.users().messages().attachments().get(
++            userId="me", messageId=message_id, id=attachment_id
++        ).execute()
++        encoded_data = attachment_body.get("data")
++    if not encoded_data:
++        raise HTTPException(status_code=422, detail="Gmail did not return attachment content")
++
++    padded_data = encoded_data + "=" * (-len(encoded_data) % 4)
++    raw_data = base64.urlsafe_b64decode(padded_data)
++    if len(raw_data) > MAX_ATTACHMENT_BYTES:
++        raise HTTPException(
++            status_code=413,
++            detail=f"Attachment exceeds the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB analysis limit",
++        )
++    return (
++        raw_data,
++        selected_part.get("filename") or "unnamed-attachment",
++        selected_part.get("mimeType") or "application/octet-stream",
++    )
++
++
+ @app.get("/")
+ def home():
+     return {
+         "status": "online",
+         "service": "PhishGuard Gmail Scanner",
+-        "version": "2.6",
++        "version": "3.0",
+         "ml_model_loaded": PHISHING_MODEL is not None,
+-        "pdf_ml_model_loaded": PDF_MODEL_FILE.exists(),
+         "scan_history": "persistent",
+         "inbox_loading": "all_messages",
+-        "attachment_analysis": "static_plus_pdf_ml",
++        "attachment_analysis": "static_and_optional_dynamic",
++        "dynamic_analysis": CAPE_CLIENT.configuration_status(),
+     }
+ 
+ 
++@app.get("/api/dynamic/status")
++def dynamic_analysis_status():
++    return CAPE_CLIENT.configuration_status()
++
++
+ @app.get("/api/messages")
+ def get_messages():
+     gmail = get_gmail_service()
+@@ -701,53 +846,12 @@ def analyse_gmail_attachment(message_id: str, part_id: str, force: bool = False)
+             if saved is not None:
+                 return saved
+ 
+-        gmail = get_gmail_service()
+-        message = gmail.users().messages().get(
+-            userId="me", id=message_id, format="full"
+-        ).execute()
+-
+-        selected_part = next(
+-            (
+-                part for part in walk_parts(message.get("payload", {}))
+-                if str(part.get("partId", "")) == part_id and part.get("filename")
+-            ),
+-            None,
+-        )
+-        if selected_part is None:
+-            raise HTTPException(status_code=404, detail="Attachment part was not found in this message")
+-
+-        body = selected_part.get("body", {}) or {}
+-        reported_size = int(body.get("size", 0) or 0)
+-        if reported_size > MAX_ATTACHMENT_BYTES:
+-            raise HTTPException(
+-                status_code=413,
+-                detail=f"Attachment exceeds the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB analysis limit",
+-            )
+-
+-        encoded_data = body.get("data")
+-        attachment_id = body.get("attachmentId")
+-        if not encoded_data and attachment_id:
+-            attachment_body = gmail.users().messages().attachments().get(
+-                userId="me",
+-                messageId=message_id,
+-                id=attachment_id,
+-            ).execute()
+-            encoded_data = attachment_body.get("data")
+-        if not encoded_data:
+-            raise HTTPException(status_code=422, detail="Gmail did not return attachment content")
+-
+-        padded_data = encoded_data + "=" * (-len(encoded_data) % 4)
+-        raw_data = base64.urlsafe_b64decode(padded_data)
+-        if len(raw_data) > MAX_ATTACHMENT_BYTES:
+-            raise HTTPException(
+-                status_code=413,
+-                detail=f"Attachment exceeds the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB analysis limit",
+-            )
++        raw_data, filename, mime_type = fetch_gmail_attachment(message_id, part_id)
+ 
+         result = analyze_attachment(
+             raw_data,
+-            filename=selected_part.get("filename") or "unnamed-attachment",
+-            declared_mime_type=selected_part.get("mimeType") or "application/octet-stream",
++            filename=filename,
++            declared_mime_type=mime_type,
+             rules_dir=YARA_RULES_DIR,
+         )
+         result.update({
+@@ -763,3 +867,89 @@ def analyse_gmail_attachment(message_id: str, part_id: str, force: bool = False)
+         raise HTTPException(status_code=413, detail=str(error)) from error
+     except Exception as error:
+         raise HTTPException(status_code=500, detail="Unable to statically analyse the selected attachment") from error
++
++
++@app.post("/api/messages/{message_id}/attachments/{part_id}/dynamic-analysis")
++def submit_dynamic_analysis(message_id: str, part_id: str, force: bool = False):
++    """Explicitly submit an attachment to a separately configured CAPE sandbox."""
++    if not re.fullmatch(r"[A-Za-z0-9_-]+", message_id):
++        raise HTTPException(status_code=400, detail="Invalid Gmail message ID")
++    if not re.fullmatch(r"[A-Za-z0-9_.-]+", part_id) or len(part_id) > 100:
++        raise HTTPException(status_code=400, detail="Invalid Gmail attachment part ID")
++    if not CAPE_CLIENT.enabled:
++        raise HTTPException(status_code=503, detail=CAPE_CLIENT.configuration_status()["message"])
++
++    existing = load_dynamic_scan(message_id, part_id)
++    if existing is not None and not force and existing["status"] != "error":
++        return existing
++
++    try:
++        raw_data, filename, _ = fetch_gmail_attachment(message_id, part_id)
++        task_id = CAPE_CLIENT.submit(raw_data, filename=filename)
++        return save_dynamic_scan(message_id, part_id, task_id, "queued")
++    except HTTPException:
++        raise
++    except DynamicAnalysisError as error:
++        raise HTTPException(status_code=502, detail=str(error)) from error
++    except Exception as error:
++        raise HTTPException(status_code=500, detail="Unable to submit the attachment for dynamic analysis") from error
++
++
++@app.get("/api/messages/{message_id}/attachments/{part_id}/dynamic-analysis")
++def get_dynamic_analysis(message_id: str, part_id: str):
++    """Poll CAPE and return a normalized behavior report once the task completes."""
++    if not re.fullmatch(r"[A-Za-z0-9_-]+", message_id):
++        raise HTTPException(status_code=400, detail="Invalid Gmail message ID")
++    if not re.fullmatch(r"[A-Za-z0-9_.-]+", part_id) or len(part_id) > 100:
++        raise HTTPException(status_code=400, detail="Invalid Gmail attachment part ID")
++
++    saved = load_dynamic_scan(message_id, part_id)
++    if saved is None:
++        raise HTTPException(status_code=404, detail="No dynamic-analysis task exists for this attachment")
++    if saved["status"] == "complete" and saved["analysis"]:
++        result = dict(saved["analysis"])
++        result.update({"message_id": message_id, "part_id": part_id, "cached": True})
++        return result
++    if saved["status"] == "error":
++        return saved
++
++    try:
++        status = CAPE_CLIENT.task_status(saved["task_id"])
++        if status == "error":
++            return save_dynamic_scan(
++                message_id,
++                part_id,
++                saved["task_id"],
++                "error",
++                submitted_at=saved["submitted_at"],
++                error="The sandbox task failed before a report was produced.",
++            )
++        if status != "complete":
++            return save_dynamic_scan(
++                message_id,
++                part_id,
++                saved["task_id"],
++                status,
++                submitted_at=saved["submitted_at"],
++            )
++
++        report = CAPE_CLIENT.report(saved["task_id"])
++        report.update({"message_id": message_id, "part_id": part_id, "cached": False})
++        save_dynamic_scan(
++            message_id,
++            part_id,
++            saved["task_id"],
++            "complete",
++            submitted_at=saved["submitted_at"],
++            analysis=report,
++        )
++        return report
++    except DynamicAnalysisError as error:
++        return save_dynamic_scan(
++            message_id,
++            part_id,
++            saved["task_id"],
++            "error",
++            submitted_at=saved["submitted_at"],
++            error=str(error),
++        )

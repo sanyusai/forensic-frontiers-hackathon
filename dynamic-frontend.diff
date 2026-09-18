@@ -1,0 +1,177 @@
+﻿diff --git ".\\frontend\\app\\page.tsx" "C:\\Users\\mehar\\OneDrive\\Desktop\\phishguard-dynamic-analysis-v3.0\\phishguard-dynamic-analysis-v3.0\\frontend\\app\\page.tsx"
+index f525743..6caa509 100644
+--- ".\\frontend\\app\\page.tsx"
++++ "C:\\Users\\mehar\\OneDrive\\Desktop\\phishguard-dynamic-analysis-v3.0\\phishguard-dynamic-analysis-v3.0\\frontend\\app\\page.tsx"
+@@ -18,6 +18,7 @@ type MailRisk = "critical" | "high" | "medium" | "safe";
+ type CheckState = "pass" | "fail" | "warn";
+ type ScanState = "idle" | "loading" | "complete" | "error";
+ type StaticState = "idle" | "loading" | "complete" | "error";
++type DynamicState = "idle" | "loading" | "complete" | "error";
+ 
+ type AnalysisCheck = {
+   name:string; group:string; state:CheckState; score:number; result:string; recommendation:string;
+@@ -48,6 +49,18 @@ type StaticAnalysisResult = {
+   executed?:boolean;
+ };
+ 
++type DynamicProcess = {pid?:number|string;parent_pid?:number|string;name:string;command_line?:string};
++type DynamicAnalysisResult = {
++  message_id?:string;part_id?:string;task_id:string;status:"complete";provider:string;
++  analysis_mode:"dynamic";executed:true;score:number;severity:MailRisk;verdict:string;
++  sample?:{name?:string;sha256?:string;type?:string};
++  behavior:{processes:DynamicProcess[];commands:string[];files_created:string[];files_deleted:string[];registry_changes:string[];dropped_files:{name:string;sha256?:string;type?:string}[]};
++  network:{domains:string[];ips:string[];urls:string[]};
++  signatures:{name:string;description:string;severity:number}[];
++  iocs:{domains:string[];ips:string[];urls:string[];dropped_sha256:string[]};
++  limitations:string[];cached?:boolean;simulated?:boolean;
++};
++
+ type GmailMessage = {
+   id: string; threadId?: string; from: string; to: string; subject: string; date: string;
+   snippet: string; labels?: string[];
+@@ -105,6 +118,31 @@ const demoStaticAnalysis:StaticAnalysisResult = {
+   analysis_mode:"static_only",executed:false,
+ };
+ 
++const demoDynamicAnalysis:DynamicAnalysisResult = {
++  task_id:"DEMO-CAPE-0421",status:"complete",provider:"Controlled CAPE-style demo",analysis_mode:"dynamic",executed:true,
++  score:98,severity:"critical",verdict:"Malicious behavior observed",simulated:true,
++  sample:{name:"Security_Update.pdf.exe",sha256:"9b7cf42eΓÇª8c16e21a",type:"PE32 executable"},
++  behavior:{
++    processes:[
++      {pid:3048,parent_pid:716,name:"Security_Update.pdf.exe",command_line:"Security_Update.pdf.exe"},
++      {pid:3220,parent_pid:3048,name:"powershell.exe",command_line:"powershell.exe -EncodedCommand [redacted]"},
++      {pid:3364,parent_pid:3220,name:"rundll32.exe",command_line:"rundll32.exe [dropped payload]"},
++    ],
++    commands:["powershell.exe -EncodedCommand [redacted]"],
++    files_created:["%APPDATA%\\Microsoft\\update.dat","%TEMP%\\payload.dll"],files_deleted:[],
++    registry_changes:["HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\SecurityUpdate"],
++    dropped_files:[{name:"payload.dll",sha256:"7c1bΓÇªdemo",type:"PE32 DLL"}],
++  },
++  network:{domains:["microsoft-security-check.example"],ips:["192.0.2.42"],urls:["hxxp://microsoft-security-check[.]example/gate"]},
++  signatures:[
++    {name:"powershell_encoded_command",description:"Spawned PowerShell with an encoded command.",severity:3},
++    {name:"registry_run_persistence",description:"Created a Run-key persistence entry.",severity:3},
++    {name:"payload_download",description:"Contacted remote infrastructure and wrote a secondary payload.",severity:3},
++  ],
++  iocs:{domains:["microsoft-security-check.example"],ips:["192.0.2.42"],urls:["hxxp://microsoft-security-check[.]example/gate"],dropped_sha256:["7c1bΓÇªdemo"]},
++  limitations:["Controlled demonstration telemetry. No malware was executed by this browser or FastAPI host."],
++};
++
+ const nav: {label:Module; icon:typeof Inbox; number:string}[] = [
+   {label:"Inbox",icon:Inbox,number:"01"},{label:"Email Analysis",icon:FileSearch,number:"02"},
+   {label:"Malware Analyser",icon:Bug,number:"03"},{label:"Risk Assessment",icon:Gauge,number:"04"},
+@@ -147,6 +185,9 @@ export default function Home(){
+   const [staticState,setStaticState]=useState<StaticState>("idle");
+   const [staticMessage,setStaticMessage]=useState("Select an attachment to run non-executing static analysis.");
+   const [staticResult,setStaticResult]=useState<StaticAnalysisResult|null>(null);
++  const [dynamicState,setDynamicState]=useState<DynamicState>("idle");
++  const [dynamicMessage,setDynamicMessage]=useState("Dynamic analysis requires an isolated CAPE sandbox.");
++  const [dynamicResult,setDynamicResult]=useState<DynamicAnalysisResult|null>(null);
+   const filtered=useMemo(()=>mailItems.filter(m=>`${m.sender} ${m.email} ${m.subject}`.toLowerCase().includes(query.toLowerCase())),[mailItems,query]);
+ 
+   const connectGmail=async()=>{
+@@ -171,6 +212,7 @@ export default function Home(){
+       setSelected(liveMails[0]);
+       setAnalysisChecks([]);setScanState("idle");setScanMessage("Ready to analyse the selected message.");
+       setStaticState("idle");setStaticResult(null);setStaticMessage("Run the email analysis first to identify attachments.");
++      setDynamicState("idle");setDynamicResult(null);setDynamicMessage("Dynamic analysis requires an isolated CAPE sandbox.");
+       setConnection("connected");
+       setConnectionMessage(`${liveMails.length} live Gmail messages loaded. Refresh to check for new mail.`);
+     }catch(error){
+@@ -204,6 +246,7 @@ export default function Home(){
+       setScanState("complete");setScanMessage(`${result.verdict} ┬╖ ${result.score}/100${result.cached?" ┬╖ saved result":""}`);
+       animateChecks(result.checks.length);
+       setStaticState("idle");setStaticResult(null);setStaticMessage(firstAttachment?"Attachment identified and ready for static analysis.":"This message has no attachment to analyse.");
++      setDynamicState("idle");setDynamicResult(null);setDynamicMessage("Complete static analysis before submitting to the isolated sandbox.");
+     }catch(error){
+       setScanState("error");setScanMessage("The scanner endpoint could not analyse this message. Replace api.py, restart it, and try again.");console.error(error);
+     }
+@@ -232,9 +275,43 @@ export default function Home(){
+       setStaticState("error");setStaticMessage(error instanceof Error?error.message:"The static analyzer could not inspect this attachment.");console.error(error);
+     }
+   };
++  const startDynamic=async(force=false)=>{
++    if(selected.source!=="gmail"){
++      setDynamicState("complete");setDynamicResult(demoDynamicAnalysis);setDynamicMessage("Controlled behavioral demonstration loaded. No live sample was executed.");return;
++    }
++    if(!selected.gmailId||!selected.attachmentPartId){
++      setDynamicState("error");setDynamicMessage("No retrievable Gmail attachment is selected. Run email and static analysis first.");return;
++    }
++    setDynamicState("loading");setDynamicResult(null);setDynamicMessage("Submitting the attachment to the separately configured CAPE sandboxΓÇª");
++    const endpoint=`${GMAIL_CONNECTOR_BASE}/api/messages/${encodeURIComponent(selected.gmailId)}/attachments/${encodeURIComponent(selected.attachmentPartId)}/dynamic-analysis`;
++    try{
++      const submit=await fetch(`${endpoint}${force?"?force=true":""}`,{method:"POST",cache:"no-store"});
++      const submitted=await submit.json() as {status?:string;task_id?:string;detail?:string;analysis?:DynamicAnalysisResult;error?:string};
++      if(!submit.ok)throw new Error(submitted.detail||`Sandbox submission returned ${submit.status}`);
++      if(submitted.status==="complete"&&submitted.analysis){
++        setDynamicResult(submitted.analysis);setDynamicState("complete");setDynamicMessage(`${submitted.analysis.verdict} ┬╖ ${submitted.analysis.score}/100 ┬╖ saved result`);return;
++      }
++      setDynamicMessage(`Sandbox task ${submitted.task_id||"submitted"} is queued. Waiting for behavioral telemetryΓÇª`);
++      for(let attempt=0;attempt<90;attempt+=1){
++        await new Promise(resolve=>window.setTimeout(resolve,4000));
++        const response=await fetch(endpoint,{cache:"no-store"});
++        const body=await response.json() as DynamicAnalysisResult&{status:string;detail?:string;error?:string;task_id?:string};
++        if(!response.ok)throw new Error(body.detail||`Sandbox status returned ${response.status}`);
++        if(body.status==="complete"){
++          setDynamicResult(body);setDynamicState("complete");setDynamicMessage(`${body.verdict} ┬╖ ${body.score}/100${body.cached?" ┬╖ saved result":""}`);return;
++        }
++        if(body.status==="error")throw new Error(body.error||"The sandbox task failed.");
++        setDynamicMessage(`Sandbox task ${body.task_id||submitted.task_id||""} is ${body.status}. Capturing processes, files, registry and network activityΓÇª`);
++      }
++      throw new Error("The sandbox is still working. Run dynamic analysis again later to resume polling the saved task.");
++    }catch(error){
++      setDynamicState("error");setDynamicMessage(error instanceof Error?error.message:"Dynamic analysis could not complete.");console.error(error);
++    }
++  };
+   const selectMail=(mail:MailItem)=>{
+     setSelected(mail);setStaticState("idle");setStaticResult(null);setMalwareStep(0);
+     setStaticMessage(mail.attachment?"Attachment identified and ready for static analysis.":"Run the email analysis first to identify attachments.");
++    setDynamicState("idle");setDynamicResult(null);setDynamicMessage("Complete static analysis before submitting to the isolated sandbox.");
+   };
+   const go=(module:Module)=>{setActive(module);setMenuOpen(false)};
+   const exportReport=()=>{
+@@ -263,7 +340,7 @@ export default function Home(){
+       <div className="stage">
+         {active==="Inbox"&&<InboxModule query={query} setQuery={setQuery} mails={filtered} selected={selected} onSelect={selectMail} onAnalyse={startEmailAnalysis} connection={connection} onRefresh={connectGmail}/>} 
+         {active==="Email Analysis"&&<EmailModule selected={selected} step={analysisStep} checks={analysisChecks} scanState={scanState} scanMessage={scanMessage} onRun={()=>startEmailAnalysis(selected,true)} onMalware={()=>startMalware(false)}/>} 
+-        {active==="Malware Analyser"&&<MalwareModule selected={selected} step={malwareStep} state={staticState} message={staticMessage} result={staticResult} onRun={()=>startMalware(true)} onRisk={()=>go("Risk Assessment")}/>} 
++        {active==="Malware Analyser"&&<MalwareModule selected={selected} step={malwareStep} state={staticState} message={staticMessage} result={staticResult} dynamicState={dynamicState} dynamicMessage={dynamicMessage} dynamicResult={dynamicResult} onRun={()=>startMalware(true)} onDynamic={()=>startDynamic(false)} onDynamicAgain={()=>startDynamic(true)} onRisk={()=>go("Risk Assessment")}/>} 
+         {active==="Risk Assessment"&&<RiskModule selected={selected} onReport={()=>go("Reports")}/>} 
+         {active==="Reports"&&<ReportsModule selected={selected} onExport={exportReport}/>} 
+       </div>
+@@ -284,10 +361,10 @@ function EmailModule({selected,step,checks,scanState,scanMessage,onRun,onMalware
+     return <><PageTitle eyebrow={`CASE ${selected.id} ┬╖ MODULE 02`} title="Email forensic analysis" description="The local scanner retrieves the original message and returns an explainable, evidence-based result."/><section className={`scan-bridge ${scanState}`}><span>{scanState==="loading"?<RefreshCw className="spin"/>:<XCircle/>}</span><div><small>{scanState==="loading"?"LIVE ANALYSIS RUNNING":"SCANNER CONNECTION ERROR"}</small><h2>{scanState==="loading"?"Checking the selected Gmail message":"Analysis could not start"}</h2><p>{scanMessage}</p>{scanState==="error"&&<Button onClick={onRun}><RefreshCw/> Try again</Button>}</div></section></>;
+   }
+   const complete=Math.min(step,checks.length);const risk=checks.slice(0,complete).reduce((a,c)=>a+c.score,0);
+-  return <><PageTitle eyebrow={`CASE ${selected.id} ┬╖ MODULE 02`} title="Email forensic analysis" description="Twelve explainable security checks validate the sender, route, content and organisation identity."><div className="title-actions"><Button variant="outline" onClick={onRun}><RefreshCw/> Run again</Button>{selected.attachment&&<Button onClick={onMalware}><Bug/> Analyse attachment</Button>}</div></PageTitle><section className="analysis-summary"><div className="message-ident"><span>{selected.initials}</span><div><small>{selected.source==="gmail"?"LIVE GMAIL MESSAGE":"SELECTED MESSAGE"}</small><strong>{selected.subject}</strong><p>{selected.email}</p></div></div><div className="progress-block"><div><span>ANALYSIS PROGRESS</span><strong>{complete}/{checks.length} checks</strong></div><Progress value={checks.length?complete/checks.length*100:0}/></div><ScoreRing score={Math.min(risk,100)} label="Email risk"/></section>{selected.source==="gmail"&&scanState==="complete"&&<div className="live-analysis-note"><ShieldCheck/><p><strong>Live first-stage result:</strong> {scanMessage}. This score is based on message headers, content patterns, links and attachment names. Reputation services and malware detonation are not included yet.</p></div>}<section className="checklist"><div className="section-head"><div><Fingerprint/><strong>Email security checklist</strong></div><span><i className="legend pass"/> Pass <i className="legend warn"/> Suspicious <i className="legend fail"/> Fail</span></div>{checks.map((check,index)=><article key={check.name} className={index>=step?"pending":""}>{index<step?<StateIcon state={check.state}/>:<span className="state-icon pending-icon">{index===step?<RefreshCw className="spin"/>:<Circle/>}</span>}<div className="check-copy"><span>{check.group}</span><strong>{check.name}</strong>{index<step&&<><p>{check.result}</p><small>Recommendation: {check.recommendation}</small></>}</div>{index<step&&<div className={`risk-points ${check.state}`}>{check.score?`+${check.score}`:"0"}<span>RISK</span></div>}</article>)}</section></>;
++  return <><PageTitle eyebrow={`CASE ${selected.id} ┬╖ MODULE 02`} title="Email forensic analysis" description="Twelve explainable security checks validate the sender, route, content and organisation identity."><div className="title-actions"><Button variant="outline" onClick={onRun}><RefreshCw/> Run again</Button>{selected.attachment&&<Button onClick={onMalware}><Bug/> Analyse attachment</Button>}</div></PageTitle><section className="analysis-summary"><div className="message-ident"><span>{selected.initials}</span><div><small>{selected.source==="gmail"?"LIVE GMAIL MESSAGE":"SELECTED MESSAGE"}</small><strong>{selected.subject}</strong><p>{selected.email}</p></div></div><div className="progress-block"><div><span>ANALYSIS PROGRESS</span><strong>{complete}/{checks.length} checks</strong></div><Progress value={checks.length?complete/checks.length*100:0}/></div><ScoreRing score={Math.min(risk,100)} label="Email risk"/></section>{selected.source==="gmail"&&scanState==="complete"&&<div className="live-analysis-note"><ShieldCheck/><p><strong>Live first-stage result:</strong> {scanMessage}. This score is based on message headers, content patterns, links and attachment names. Attachment static/dynamic analysis runs separately from Module 03.</p></div>}<section className="checklist"><div className="section-head"><div><Fingerprint/><strong>Email security checklist</strong></div><span><i className="legend pass"/> Pass <i className="legend warn"/> Suspicious <i className="legend fail"/> Fail</span></div>{checks.map((check,index)=><article key={check.name} className={index>=step?"pending":""}>{index<step?<StateIcon state={check.state}/>:<span className="state-icon pending-icon">{index===step?<RefreshCw className="spin"/>:<Circle/>}</span>}<div className="check-copy"><span>{check.group}</span><strong>{check.name}</strong>{index<step&&<><p>{check.result}</p><small>Recommendation: {check.recommendation}</small></>}</div>{index<step&&<div className={`risk-points ${check.state}`}>{check.score?`+${check.score}`:"0"}<span>RISK</span></div>}</article>)}</section></>;
+ }
+ 
+-function MalwareModule({selected,step,state,message,result,onRun,onRisk}:{selected:MailItem;step:number;state:StaticState;message:string;result:StaticAnalysisResult|null;onRun:()=>void;onRisk:()=>void}){
++function MalwareModule({selected,step,state,message,result,dynamicState,dynamicMessage,dynamicResult,onRun,onDynamic,onDynamicAgain,onRisk}:{selected:MailItem;step:number;state:StaticState;message:string;result:StaticAnalysisResult|null;dynamicState:DynamicState;dynamicMessage:string;dynamicResult:DynamicAnalysisResult|null;onRun:()=>void;onDynamic:()=>void;onDynamicAgain:()=>void;onRisk:()=>void}){
+   const complete=result?Math.min(step,result.checks.length):0;
+   const visibleRisk=result&&complete===result.checks.length?result.score:result?Math.min(100,result.checks.slice(0,complete).reduce((sum,check)=>sum+check.score,0)):0;
+   const size=result?.size??selected.attachmentSize??0;
+@@ -295,10 +372,19 @@ function MalwareModule({selected,step,state,message,result,onRun,onRisk}:{select
+   const yara=result?.indicators.yara;
+   const severityClass=result?.severity==="critical"?"critical-tag":result?.severity==="high"?"high-tag":"";
+ 
+-  return <><PageTitle eyebrow={`CASE ${selected.id} ┬╖ MODULE 03`} title="Static attachment analyser" description="Non-executing inspection of Gmail attachment bytes using hashes, file signatures, entropy, strings, structure checks and optional YARA rules."><div className="sandbox-status"><span/><div><small>ANALYSIS MODE</small><strong>Static only ┬╖ no execution</strong></div></div></PageTitle>
++  const behavior=dynamicResult?.behavior;
++  const network=dynamicResult?.network;
++  return <><PageTitle eyebrow={`CASE ${selected.id} ┬╖ MODULE 03`} title="Attachment malware analyser" description="Static inspection first, followed by optional execution in a separately administered CAPE sandbox."><div className="sandbox-status"><span/><div><small>ANALYSIS PIPELINE</small><strong>Static ΓåÆ isolated dynamic</strong></div></div></PageTitle>
+     {(state==="loading"||state==="error")&&<section className={`scan-bridge ${state}`}><span>{state==="loading"?<RefreshCw className="spin"/>:<XCircle/>}</span><div><small>{state==="loading"?"STATIC ANALYSIS RUNNING":"STATIC ANALYSIS ERROR"}</small><h2>{state==="loading"?"Inspecting the selected attachment":"Attachment analysis could not complete"}</h2><p>{message}</p>{state==="error"&&selected.attachment&&<Button onClick={onRun}><RefreshCw/> Try again</Button>}</div></section>}
+     {state==="idle"&&<section className="scan-bridge"><span><FileSearch/></span><div><small>READY FOR STATIC ANALYSIS</small><h2>{selected.attachment||"No Gmail attachment selected"}</h2><p>{message}</p>{selected.attachment&&<Button onClick={onRun}><Play/> Analyse attachment</Button>}</div></section>}
+-    {state==="complete"&&result&&<><section className="sandbox-map"><div className="sample-card"><FileCode2/><div><small>IN-MEMORY SAMPLE</small><strong>{result.filename}</strong><p>{sizeLabel} ┬╖ SHA-256: {result.hashes.sha256.slice(0,12)}ΓÇª{result.hashes.sha256.slice(-12)}</p></div></div><ChevronRight/><div className="sandbox-box"><LockKeyhole/><div><small>STATIC INSPECTION BOUNDARY</small><strong>Bytes inspected ┬╖ never launched</strong><p>Disk persistence: none ┬╖ Network lookup: none</p></div><Badge>LIVE</Badge></div><ChevronRight/><ScoreRing score={visibleRisk} label="Static threat score"/></section><div className="sandbox-caution"><ServerCog/><p><strong>Safety boundary:</strong> PhishGuard reads the attachment in memory and does not execute, import, render, extract, or upload it. Static findings indicate risk but cannot prove runtime behavior.</p></div><section className="malware-grid"><div className="malware-checks"><div className="section-head"><div><Bug/><strong>Static attachment checks ┬╖ {complete}/{result.checks.length}</strong></div><Button size="sm" variant="outline" onClick={onRun}><RefreshCw/> Run again</Button></div>{result.checks.map((check,index)=><article key={check.name} className={index>=step?"pending":""}>{index<step?<StateIcon state={check.state}/>:<span className="state-icon pending-icon">{index===step?<RefreshCw className="spin"/>:<Circle/>}</span>}<div><strong>{check.name}</strong>{index<step&&<><p>{check.result}</p>{check.evidence?.length?<small>{check.evidence.slice(0,3).join(" ┬╖ ")}</small>:null}</>}</div>{index<step&&check.score>0&&<span className="mal-score">+{check.score}</span>}</article>)}</div><aside className="malware-profile"><span>STATIC FILE PROFILE</span><h3>{result.classification}</h3><Badge className={severityClass}>{result.verdict.toUpperCase()}</Badge><dl><div><dt>Detected type</dt><dd>{result.identified_type}</dd></div><div><dt>Entropy</dt><dd>{result.entropy} / 8.0</dd></div><div><dt>YARA</dt><dd>{yara?.available?`${yara.matches.length} match(es)`:"Optional engine unavailable"}</dd></div><div><dt>Execution</dt><dd>Never executed</dd></div><div><dt>Reputation</dt><dd>Not queried</dd></div></dl>{selected.source!=="gmail"?<Button onClick={onRisk}>Open demo correlation <ChevronRight/></Button>:<Button disabled>Risk correlation ┬╖ future phase</Button>}</aside></section></>}
++    {state==="complete"&&result&&<><section className="sandbox-map"><div className="sample-card"><FileCode2/><div><small>IN-MEMORY SAMPLE</small><strong>{result.filename}</strong><p>{sizeLabel} ┬╖ SHA-256: {result.hashes.sha256.slice(0,12)}ΓÇª{result.hashes.sha256.slice(-12)}</p></div></div><ChevronRight/><div className="sandbox-box"><LockKeyhole/><div><small>STATIC INSPECTION BOUNDARY</small><strong>Bytes inspected ┬╖ never launched</strong><p>Disk persistence: none ┬╖ Network lookup: none</p></div><Badge>LIVE</Badge></div><ChevronRight/><ScoreRing score={visibleRisk} label="Static threat score"/></section><div className="sandbox-caution"><ServerCog/><p><strong>Safety boundary:</strong> Static analysis never executes the attachment. Dynamic analysis below sends it only to the separately configured sandbox after an explicit click.</p></div><section className="malware-grid"><div className="malware-checks"><div className="section-head"><div><Bug/><strong>Static attachment checks ┬╖ {complete}/{result.checks.length}</strong></div><Button size="sm" variant="outline" onClick={onRun}><RefreshCw/> Run again</Button></div>{result.checks.map((check,index)=><article key={check.name} className={index>=step?"pending":""}>{index<step?<StateIcon state={check.state}/>:<span className="state-icon pending-icon">{index===step?<RefreshCw className="spin"/>:<Circle/>}</span>}<div><strong>{check.name}</strong>{index<step&&<><p>{check.result}</p>{check.evidence?.length?<small>{check.evidence.slice(0,3).join(" ┬╖ ")}</small>:null}</>}</div>{index<step&&check.score>0&&<span className="mal-score">+{check.score}</span>}</article>)}</div><aside className="malware-profile"><span>STATIC FILE PROFILE</span><h3>{result.classification}</h3><Badge className={severityClass}>{result.verdict.toUpperCase()}</Badge><dl><div><dt>Detected type</dt><dd>{result.identified_type}</dd></div><div><dt>Entropy</dt><dd>{result.entropy} / 8.0</dd></div><div><dt>YARA</dt><dd>{yara?.available?`${yara.matches.length} match(es)`:"Optional engine unavailable"}</dd></div><div><dt>Execution</dt><dd>Not on this host</dd></div><div><dt>Sandbox</dt><dd>{dynamicState==="complete"?"Report ready":"Explicit opt-in"}</dd></div></dl><Button onClick={onDynamic} disabled={dynamicState==="loading"}>{dynamicState==="loading"?<><RefreshCw className="spin"/> Sandbox running</>:<><Play/> {selected.source==="gmail"?"Run dynamic sandbox":"Load dynamic demo"}</>}</Button></aside></section>
++    <section className={`dynamic-panel ${dynamicState}`}><header><div><Network/><span><small>DYNAMIC ANALYSIS</small><strong>{dynamicResult?.provider||"CAPE Sandbox integration"}</strong></span></div>{dynamicResult?.simulated&&<Badge>CONTROLLED DEMO</Badge>}{dynamicState==="complete"&&<Button size="sm" variant="outline" onClick={onDynamicAgain}><RefreshCw/> Run again</Button>}</header>
++      {dynamicState!=="complete"&&<div className="dynamic-wait"><span>{dynamicState==="loading"?<RefreshCw className="spin"/>:dynamicState==="error"?<XCircle/>:<ServerCog/>}</span><div><h3>{dynamicState==="loading"?"Sandbox task in progress":dynamicState==="error"?"Dynamic analysis unavailable":"Ready for isolated behavioral analysis"}</h3><p>{dynamicMessage}</p>{dynamicState!=="loading"&&<Button onClick={onDynamic}><Play/> {dynamicState==="error"?"Try again":"Start dynamic analysis"}</Button>}</div></div>}
++      {dynamicState==="complete"&&dynamicResult&&<><div className="dynamic-summary"><ScoreRing score={dynamicResult.score} label="Behavior score"/><div><span>OBSERVED VERDICT</span><h3>{dynamicResult.verdict}</h3><p>{dynamicResult.simulated?"Controlled presentation telemetry ΓÇö no live detonation occurred.":`CAPE task ${dynamicResult.task_id} completed in the isolated sandbox.`}</p></div><div className="telemetry-counts"><span><strong>{behavior?.processes.length||0}</strong>Processes</span><span><strong>{behavior?.files_created.length||0}</strong>Files written</span><span><strong>{behavior?.registry_changes.length||0}</strong>Registry</span><span><strong>{(network?.domains.length||0)+(network?.ips.length||0)}</strong>Network IOCs</span></div></div>
++      <div className="dynamic-grid"><article><div className="section-head"><div><Activity/><strong>Process activity</strong></div></div><div className="event-list">{behavior?.processes.length?behavior.processes.slice(0,12).map((process,index)=><div key={`${process.pid}-${index}`}><code>{process.name}</code><span>PID {process.pid||"?"} ┬╖ Parent {process.parent_pid||"?"}</span><p>{process.command_line||"No command line captured"}</p></div>):<p className="empty-telemetry">No process telemetry returned.</p>}</div></article>
++      <article><div className="section-head"><div><Fingerprint/><strong>Behavioral signatures</strong></div></div><div className="event-list">{dynamicResult.signatures.length?dynamicResult.signatures.slice(0,12).map(signature=><div key={signature.name}><code>{signature.name}</code><span>Severity {signature.severity}</span><p>{signature.description||"Behavioral match"}</p></div>):<p className="empty-telemetry">No behavioral signatures returned.</p>}</div></article></div>
++      <div className="ioc-strip"><div><span>DOMAINS</span><p>{network?.domains.slice(0,6).join(" ┬╖ ")||"None observed"}</p></div><div><span>IP ADDRESSES</span><p>{network?.ips.slice(0,6).join(" ┬╖ ")||"None observed"}</p></div><div><span>FILES / REGISTRY</span><p>{[...(behavior?.files_created||[]),...(behavior?.registry_changes||[])].slice(0,5).join(" ┬╖ ")||"None observed"}</p></div></div><Button className="dynamic-risk" onClick={onRisk}>Correlate static + dynamic evidence <ChevronRight/></Button></>}
++    </section></>}
+   </>;
+ }
+ 
